@@ -12,7 +12,7 @@ def client(fake, cfg):
 
 def test_health(client):
     j = client.get("/api/health").json()
-    assert j["vllm"] == "ok" and j["window_tokens"] == 400 and j["script_turns"] == 20
+    assert j["vllm"] == "ok" and j["window_tokens"] == 400 and j["script_turns"] == 30
 
 
 def test_session_and_scripted_turns(client, fake):
@@ -53,4 +53,4 @@ def test_race_completes_with_verdict(client, fake, cfg):
         assert len(j["sides"][side]["turns"]) == 30
         assert j["sides"][side]["totals"]["remembered"] == j["sides"][side]["totals"]["asked"] == 24
     assert [e["n"] for e in j["sides"]["right"]["events"] if e["event"] == "handoff"] == [10, 20]
-    assert "Handoff:" in j["verdict"]
+    assert "Handoff every" in j["verdict"]
