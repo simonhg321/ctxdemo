@@ -1,0 +1,22 @@
+[
+  {"n": 1,  "user": "Hey, I need help planning the HacLab open house. It's Saturday October 24th. Can you keep track of details as we go?", "plants": ["date"], "asks": []},
+  {"n": 2,  "user": "We got Herak 218 for the room. It fits about 60 people. Doors open at 10am and we wrap by 2.", "plants": ["room", "start"], "asks": []},
+  {"n": 3,  "user": "Budget is $1,850 total from the department. That has to cover food, printing, and swag.", "plants": ["budget"], "asks": []},
+  {"n": 4,  "user": "Our guest speaker is Dr. Priya Raman from WSU. She's talking about GPU clusters for undergrads. Give me three possible talk titles.", "plants": ["guest"], "asks": []},
+  {"n": 5,  "user": "Food: 12 pizzas from Flying Goat. One thing to remember, Marcus on the student team is vegan, so at least two need to be vegan.", "plants": ["pizza", "diet"], "asks": []},
+  {"n": 6,  "user": "Swag: 40 t-shirts from Spokane Print Co. Any ideas for a short slogan that fits on a shirt?", "plants": ["tshirts"], "asks": []},
+  {"n": 7,  "user": "Logistics note for whoever sets up: the projector in that room only takes HDMI 1, port 2 is dead. Also the parking code for the lot is BULLDOG24.", "plants": ["hdmi", "parking"], "asks": []},
+  {"n": 8,  "user": "The live demo is the GPU wall dashboard on the big screen. Can you write two sentences introducing it for the program?", "plants": ["demo"], "asks": []},
+  {"n": 9,  "user": "Flyers must be at the print shop by October 9th to make it back in time. Draft the flyer text, keep it under 60 words.", "plants": ["deadline"], "asks": []},
+  {"n": 10, "user": "Ok, that's the plan so far. Let's keep going.", "plants": [], "asks": []},
+  {"n": 11, "user": "Remind me, what date is the open house and what time do doors open?", "plants": [], "asks": ["date", "start"]},
+  {"n": 12, "user": "Which room did we get?", "plants": [], "asks": ["room"]},
+  {"n": 13, "user": "What's the total budget again? And roughly split it across food, printing, and swag.", "plants": [], "asks": ["budget"]},
+  {"n": 14, "user": "Who is the guest speaker and where is she from?", "plants": [], "asks": ["guest"]},
+  {"n": 15, "user": "Write the food order as a one-line message to the restaurant. Include the dietary thing.", "plants": [], "asks": ["pizza", "diet"]},
+  {"n": 16, "user": "What do I need to tell the AV setup person about the projector?", "plants": [], "asks": ["hdmi"]},
+  {"n": 17, "user": "What's the parking code, and how many shirts did we order and from whom?", "plants": [], "asks": ["parking", "tshirts"]},
+  {"n": 18, "user": "What is the live demo, in one sentence?", "plants": [], "asks": ["demo"]},
+  {"n": 19, "user": "When do the flyers have to be at the print shop?", "plants": [], "asks": ["deadline"]},
+  {"n": 20, "user": "Give me a final checklist with every concrete detail we settled: date, time, room, budget, speaker, food, shirts, projector, parking, demo, flyer deadline.", "plants": [], "asks": ["date", "start", "room", "budget", "guest", "pizza", "diet", "tshirts", "hdmi", "parking", "demo", "deadline"]}
+]

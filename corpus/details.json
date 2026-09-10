@@ -1,0 +1,14 @@
+[
+  {"id": "date",     "text": "Saturday October 24th",            "aliases": ["october 24", "oct 24", "24th of october", "24 october"]},
+  {"id": "room",     "text": "Herak 218",                         "aliases": ["herak 218", "218"]},
+  {"id": "budget",   "text": "$1,850 budget",                     "aliases": ["1,850", "1850"]},
+  {"id": "guest",    "text": "Dr. Priya Raman from WSU",          "aliases": ["priya", "raman"]},
+  {"id": "diet",     "text": "Marcus is vegan",                   "aliases": ["vegan"]},
+  {"id": "hdmi",     "text": "the projector only takes HDMI 1, port 2 is dead", "aliases": ["hdmi 1", "port 1", "port 2 is dead", "port two is dead", "second port"]},
+  {"id": "start",    "text": "doors open at 10am",                "aliases": ["10am", "10 am", "10:00", "ten a.m", "ten am"]},
+  {"id": "tshirts",  "text": "40 t-shirts from Spokane Print Co", "aliases": ["spokane print", "40 t-shirt", "40 shirts", "forty"]},
+  {"id": "parking",  "text": "parking code is BULLDOG24",         "aliases": ["bulldog24", "bulldog 24"]},
+  {"id": "demo",     "text": "the live demo is the GPU wall dashboard", "aliases": ["gpu wall", "wall dashboard", "dashboard"]},
+  {"id": "pizza",    "text": "12 pizzas from Flying Goat",        "aliases": ["flying goat", "12 pizza", "twelve pizza"]},
+  {"id": "deadline", "text": "flyers must be at the print shop by October 9th", "aliases": ["october 9", "oct 9", "9th"]}
+]
