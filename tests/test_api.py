@@ -50,7 +50,7 @@ def test_race_completes_with_verdict(client, fake, cfg):
     j = client.get(f"/api/race/{jid}").json()
     assert j["status"] == "done", j.get("error")
     for side in ("left", "right"):
-        assert len(j["sides"][side]["turns"]) == 20
+        assert len(j["sides"][side]["turns"]) == 30
         assert j["sides"][side]["totals"]["remembered"] == j["sides"][side]["totals"]["asked"] == 24
-    assert any(e["event"] == "handoff" for e in j["sides"]["right"]["events"])
+    assert [e["n"] for e in j["sides"]["right"]["events"] if e["event"] == "handoff"] == [10, 20]
     assert "Handoff:" in j["verdict"]

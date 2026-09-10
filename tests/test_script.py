@@ -3,8 +3,8 @@ from app import script, grader
 
 def test_script_shape():
     s = script.load()
-    assert len(s.turns) == 20 and len(s.details) == 12
-    assert [t.n for t in s.turns] == list(range(1, 21))
+    assert len(s.turns) == 30 and len(s.details) == 12
+    assert [t.n for t in s.turns] == list(range(1, 31))
 
 
 def test_every_ask_was_planted_earlier():

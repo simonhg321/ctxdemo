@@ -149,7 +149,7 @@
       <div class="chat" id="chat-compact"></div>
       <div class="controls">
         <button class="primary" id="next-compact">Next scripted message</button>
-        <button id="auto-compact">Run all 20</button>
+        <button id="auto-compact">Run all 30</button>
         <button id="reset-compact">Start over</button>
       </div>
     </div>
@@ -159,12 +159,12 @@
 
 <!-- ===== tab 3 ===== -->
 <section class="tab" id="tab-race">
-  <p class="intro">The same 20-message conversation, twice. Left: one long session that compacts when it must. Right: at message <span id="hturn">10</span> the user ends the session, the assistant writes a short <b>handoff note</b>, and a fresh session starts with only that note. Same questions, real numbers, nothing rigged.</p>
+  <p class="intro">The same 30-message conversation, twice. Left: one long session with a big-context assistant, every message carries the whole transcript. Right: every <span id="hturn">10</span> messages the user ends the session, the assistant writes a short <b>handoff note</b>, and a fresh session starts with only that note. Same questions, real numbers, nothing rigged.</p>
   <div class="controls"><button class="primary" id="play">Play</button><span id="race-status" style="color:var(--dim)"></span></div>
   <div class="progress"><b id="race-prog"></b></div>
   <div class="race">
-    <div class="side left"><h3>One long session</h3><div class="totals" id="tot-left"></div><div class="turns" id="turns-left"></div></div>
-    <div class="side right"><h3>Handoff at message <span id="hturn2">10</span></h3><div class="totals" id="tot-right"></div><div class="turns" id="turns-right"></div></div>
+    <div class="side left"><h3>One long session, never resets</h3><div class="totals" id="tot-left"></div><div class="turns" id="turns-left"></div></div>
+    <div class="side right"><h3>Handoff every <span id="hturn2">10</span> messages</h3><div class="totals" id="tot-right"></div><div class="turns" id="turns-right"></div></div>
   </div>
   <div class="verdict" id="verdict"></div>
 </section>
@@ -264,7 +264,7 @@
     const free = $('free-' + key);
     if (free) free.addEventListener('keydown', e => { if (e.key === 'Enter' && free.value.trim()) { const v = free.value.trim(); free.value = ''; turn(v); } });
     const auto = $('auto-' + key);
-    if (auto) auto.addEventListener('click', async () => { for (let i = 0; i < 20; i++) { const t = await turn(); if (!t) break; } });
+    if (auto) auto.addEventListener('click', async () => { for (let i = 0; i < 30; i++) { const t = await turn(); if (!t) break; } });
     start().catch(() => {});
   }
 

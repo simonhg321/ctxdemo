@@ -1,6 +1,7 @@
 """Background jobs: the side-by-side race (compact vs handoff) through the scripted conversation."""
 from __future__ import annotations
 import threading, uuid
+from dataclasses import replace
 from .session import Session
 from .script import Script
 from . import grader
@@ -12,8 +13,8 @@ class RaceJob:
         self.vllm, self.cfg, self.script = vllm, cfg, script
         self.status = "running"
         self.error: str | None = None
-        self.sides = {"left": {"mode": "compact", "label": "one long session", "turns": [], "events": [], "totals": {}},
-                      "right": {"mode": "handoff", "label": f"handoff at turn {cfg.handoff_turn}", "turns": [], "events": [], "totals": {}}}
+        self.sides = {"left": {"mode": "endless", "label": "one long session, never resets", "turns": [], "events": [], "totals": {}},
+                      "right": {"mode": "handoff", "label": f"handoff every {cfg.handoff_turn} messages", "turns": [], "events": [], "totals": {}}}
         self.verdict: str | None = None
         self._lock = threading.Lock()
 
@@ -22,9 +23,12 @@ class RaceJob:
 
     def _run_side(self, key: str):
         side = self.sides[key]
-        s = Session(side["mode"], self.vllm, self.cfg)
+        cfg = self.cfg
+        if side["mode"] == "endless":               # big-context assistant: the whole transcript every time
+            cfg = replace(cfg, window_tokens=cfg.race_long_window)
+        s = Session(side["mode"], self.vllm, cfg)
         for t in self.script.turns:
-            if side["mode"] == "handoff" and t.n == self.cfg.handoff_turn + 1:
+            if side["mode"] == "handoff" and t.n > 1 and (t.n - 1) % self.cfg.handoff_turn == 0:
                 h = s.handoff()
                 s = h.new_session
                 with self._lock:
@@ -72,9 +76,10 @@ class RaceJob:
     def _verdict(self) -> str:
         L, R = self.sides["left"]["totals"], self.sides["right"]["totals"]
         ratio = (L["sent"] / R["sent"]) if R.get("sent") else 0
-        return (f"Same 20-turn conversation. Handoff: {R['remembered']}/{R['asked']} details remembered, "
-                f"{R['sent']:,} tokens sent. One long session: {L['remembered']}/{L['asked']} remembered, "
-                f"{L['sent']:,} tokens sent — {ratio:.1f}× more.")
+        n = len(self.script.turns)
+        return (f"Same {n}-message conversation. Handoff every {self.cfg.handoff_turn}: {R['sent']:,} tokens sent, "
+                f"{R['remembered']}/{R['asked']} details remembered. One long session: {L['sent']:,} tokens sent "
+                f"({ratio:.1f}× more), {L['remembered']}/{L['asked']} remembered.")
 
     def state(self) -> dict:
         with self._lock:

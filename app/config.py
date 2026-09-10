@@ -16,6 +16,7 @@ class Config:
     handoff_turn: int = 10
     model: str = "qwen3-8b"
     answer_max_tokens: int = 400
+    race_long_window: int = 30000   # the 'one long session' side: a big-context assistant that never compacts
     vllm_url: str = "http://127.0.0.1:8100"
     prices: dict[str, dict[str, float]] = field(default_factory=dict)
 
