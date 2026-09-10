@@ -1,0 +1,6 @@
+{
+  "_note": "USD per 1M tokens, in/out. Illustrative public list prices; edit freely.",
+  "Frontier model": {"in": 15.0, "out": 75.0},
+  "Mid-size model": {"in": 3.0, "out": 15.0},
+  "Small model":    {"in": 0.8, "out": 4.0}
+}
