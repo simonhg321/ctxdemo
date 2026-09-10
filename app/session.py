@@ -12,10 +12,10 @@ Mode = Literal["endless", "compact", "handoff"]
 SYSTEM = ("You are a helpful assistant helping plan a university lab open house. "
           "Answer briefly and concretely. Use the details the user has given you.")
 SUMMARY_PROMPT = ("Summarize the conversation below so that an assistant can continue it. "
-                  "Keep every concrete fact (dates, names, numbers, places, rules) in a compact list. "
+                  "List EVERY concrete fact exactly as stated (dates, names, numbers, codes, places, rules) — do not paraphrase or drop any. "
                   "Plain text, no preamble.\n\nCONVERSATION:\n")
 HANDOFF_PROMPT = ("Write a handoff note for a fresh assistant who will continue this conversation. "
-                  "Include: the goal, every decision and concrete fact so far (dates, names, numbers, places, rules), "
+                  "Include: the goal, then EVERY concrete fact exactly as stated (dates, names, numbers, codes, places, rules) — do not paraphrase or drop any, "
                   "and the next step. Plain text, no preamble.\n\nCONVERSATION:\n")
 
 
