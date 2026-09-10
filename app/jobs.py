@@ -23,9 +23,8 @@ class RaceJob:
 
     def _run_side(self, key: str):
         side = self.sides[key]
-        cfg = self.cfg
-        if side["mode"] == "endless":               # big-context assistant: the whole transcript every time
-            cfg = replace(cfg, window_tokens=cfg.race_long_window)
+        # both sides get the real, big window: the only difference is the handoff discipline
+        cfg = replace(self.cfg, window_tokens=self.cfg.race_long_window)
         s = Session(side["mode"], self.vllm, cfg)
         for t in self.script.turns:
             if side["mode"] == "handoff" and t.n > 1 and (t.n - 1) % self.cfg.handoff_turn == 0:

@@ -1,8 +1,8 @@
 {
   "window_tokens": 1024,
   "compact_at": 0.95,
-  "summary_max_tokens": 350,
-  "handoff_max_tokens": 350,
+  "summary_max_tokens": 500,
+  "handoff_max_tokens": 500,
   "handoff_turn": 10,
   "model": "qwen3-8b",
   "answer_max_tokens": 400,
