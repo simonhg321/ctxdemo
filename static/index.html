@@ -42,7 +42,7 @@
   /* chat + backpack layout */
   .duo { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; align-items: start; }
   @media (max-width: 860px) { .duo { grid-template-columns: 1fr; } }
-  .chat { display: grid; gap: 10px; }
+  .chat { display: grid; gap: 10px; align-content: start; max-height: 62vh; overflow-y: auto; padding-right: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 12px; min-height: 240px; }
   .msg { display: grid; gap: 4px; max-width: 70ch; }
   .msg .who { color: var(--dim); font-size: 13px; }
   .msg .body { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; white-space: pre-wrap; }
@@ -183,8 +183,9 @@
   }));
 
   // ---- api
-  const api = async (path, body) => {
-    const r = await fetch('api/' + path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+  const api = async (path, body, method) => {
+    method = method || (body ? 'POST' : 'GET');
+    const r = await fetch('api/' + path, method === 'POST' ? { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) } : {});
     if (!r.ok) { let d = ''; try { d = (await r.json()).detail; } catch (e) {} throw new Error(d || r.status); }
     return r.json();
   };
@@ -229,13 +230,14 @@
     chat.insertAdjacentHTML('beforeend', `<div class="msg user"><div class="who">you · ${t.typed_words} words</div><div class="body">${esc(t.user)}</div></div>`);
     if (t.event === 'over_limit') {
       chat.insertAdjacentHTML('beforeend', `<div class="event red"><div class="t">Backpack full — this message can't be sent</div><div class="x">${esc(t.event_text)}\nIn a real assistant this is where you'd hit "conversation too long", or it would compact on its own.</div></div>`);
+      chat.scrollTop = chat.scrollHeight;
       return;
     }
     let badges = '';
     for (const [id, ok] of Object.entries(t.remembered || {})) badges += `<span class="badge ${ok ? 'ok' : 'miss'}">${ok ? '✓' : '✗'} ${id}</span>`;
     chat.insertAdjacentHTML('beforeend', `<div class="msg"><div class="who">assistant${badges}</div><div class="body">${esc(t.answer)}</div>
       <div class="rcpt"><span>received <b>${fmt(t.sent_tokens)}</b> tokens</span><span>wrote <b>${fmt(t.new_tokens)}</b></span><span><b>${t.seconds}</b> s</span><span>${money(t.cost_usd)}</span></div></div>`);
-    chat.lastElementChild.scrollIntoView({ block: 'nearest' });
+    chat.scrollTop = chat.scrollHeight;
   }
   const esc = s => (s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
@@ -256,7 +258,9 @@
         renderTurn(chat, r.turn); packUpdate(pack, r.turn, r.state);
         return r.turn;
       } catch (e) {
-        chat.insertAdjacentHTML('beforeend', `<div class="event red"><div class="t">${esc(String(e.message))}</div></div>`);
+        const m = String(e.message) === 'script finished' ? 'End of the script — press Start over to run it again, or type your own message.' : String(e.message);
+        chat.insertAdjacentHTML('beforeend', `<div class="event"><div class="t">${esc(m)}</div></div>`);
+        chat.scrollTop = chat.scrollHeight;
       } finally { busy = false; buttons().forEach(b => b.disabled = false); }
     }
     $('next-' + key).addEventListener('click', () => turn());
@@ -295,7 +299,7 @@
   $('play').addEventListener('click', async () => {
     $('play').disabled = true; $('verdict').textContent = ''; $('race-status').textContent = 'running…';
     try {
-      const { job_id } = await api('race/run');
+      const { job_id } = await api('race/run', null, 'POST');
       clearInterval(raceTimer);
       raceTimer = setInterval(async () => {
         const j = await api('race/' + job_id);
