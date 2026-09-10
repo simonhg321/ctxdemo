@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Backpack</title>
+<style>
+  :root {
+    --ground: #0f1216; --panel: #171c22; --line: #262d36;
+    --bone: #e6e1d6; --dim: #6b7480; --amber: #f2a93b; --ice: #7fc8e8; --red: #e0553c; --moss: #9bbf6a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ground); color: var(--bone); }
+  body { font: 16px/1.5 "Helvetica Neue", "Segoe UI", system-ui, sans-serif; font-variant-numeric: tabular-nums; min-height: 100vh; }
+  button { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 16px; cursor: pointer; }
+  button:hover { border-color: var(--dim); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.primary { background: var(--bone); color: var(--ground); border-color: var(--bone); font-weight: 600; }
+  input[type=text] { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; width: 100%; }
+  input:focus, button:focus-visible { outline: 2px solid var(--ice); outline-offset: 1px; }
+
+  header { display: flex; align-items: baseline; gap: 28px; padding: 22px 32px 0; flex-wrap: wrap; }
+  header h1 { font-size: 26px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+  header .lede { color: var(--dim); max-width: 60ch; }
+  header .live { margin-left: auto; color: var(--dim); display: flex; align-items: center; gap: 8px; }
+  header .live i { width: 9px; height: 9px; border-radius: 50%; background: var(--moss); display: inline-block; }
+  header .live.down i { background: var(--red); }
+
+  nav { display: flex; gap: 4px; padding: 18px 32px 0; border-bottom: 1px solid var(--line); }
+  nav button { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 10px 14px; color: var(--dim); }
+  nav button[aria-selected=true] { color: var(--bone); border-bottom-color: var(--amber); }
+
+  .banner { margin: 16px 32px 0; padding: 12px 16px; border: 1px solid var(--red); background: var(--panel); display: none; }
+  .banner.on { display: block; }
+
+  section.tab { display: none; padding: 22px 32px 40px; }
+  section.tab.on { display: block; }
+  .intro { color: var(--dim); max-width: 70ch; margin: 0 0 18px; }
+  .intro b { color: var(--bone); font-weight: 500; }
+  abbr.v { text-decoration: none; border-bottom: 1px dotted var(--dim); cursor: help; color: var(--bone); }
+
+  /* chat + backpack layout */
+  .duo { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; align-items: start; }
+  @media (max-width: 860px) { .duo { grid-template-columns: 1fr; } }
+  .chat { display: grid; gap: 10px; }
+  .msg { display: grid; gap: 4px; max-width: 70ch; }
+  .msg .who { color: var(--dim); font-size: 13px; }
+  .msg .body { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; white-space: pre-wrap; }
+  .msg.user .body { background: none; border-color: var(--line); }
+  .msg .rcpt { color: var(--dim); font-size: 13px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .msg .rcpt b { color: var(--bone); font-weight: 500; }
+  .badge { display: inline-block; font-size: 12px; padding: 1px 7px; border-radius: 3px; border: 1px solid var(--line); margin-left: 6px; }
+  .badge.ok { color: var(--moss); border-color: var(--moss); }
+  .badge.miss { color: var(--red); border-color: var(--red); }
+  .event { border-left: 3px solid var(--ice); background: var(--panel); padding: 10px 14px; max-width: 70ch; }
+  .event.red { border-left-color: var(--red); }
+  .event .t { font-weight: 600; margin-bottom: 4px; }
+  .event .x { color: var(--dim); white-space: pre-wrap; font-size: 14px; max-height: 220px; overflow: auto; }
+  .controls { display: flex; gap: 10px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .controls input { flex: 1; min-width: 200px; }
+
+  .pack { position: sticky; top: 16px; display: grid; gap: 14px; }
+  .pack .bar { position: relative; height: 340px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); overflow: hidden; }
+  .pack .bar .seg { position: absolute; left: 0; right: 0; transition: height .5s cubic-bezier(.2,.7,.2,1), bottom .5s cubic-bezier(.2,.7,.2,1); }
+  .pack .bar .system { background: var(--dim); }
+  .pack .bar .memory { background: var(--ice); }
+  .pack .bar .transcript { background: var(--amber); }
+  .pack .bar .message { background: var(--bone); }
+  .pack .bar .limit { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--red); }
+  .pack .bar .limit span { position: absolute; right: 6px; top: 2px; color: var(--red); font-size: 12px; }
+  .pack.full .bar { border-color: var(--red); }
+  .pack .big { font-size: 34px; font-weight: 200; letter-spacing: -0.03em; line-height: 1.1; }
+  .pack .big small { font-size: 14px; color: var(--dim); display: block; font-weight: 400; letter-spacing: 0; }
+  .pack .legend { display: grid; gap: 4px; color: var(--dim); font-size: 13px; }
+  .pack .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: -1px; }
+  .pack .total { color: var(--dim); font-size: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
+  .pack .total b { color: var(--bone); font-weight: 500; }
+
+  /* race */
+  .race { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+  @media (max-width: 860px) { .race { grid-template-columns: 1fr; } }
+  .side h3 { margin: 0 0 4px; font-weight: 500; font-size: 18px; }
+  .side.left h3 { color: var(--amber); } .side.right h3 { color: var(--ice); }
+  .side .totals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 10px 0 14px; }
+  .side .totals div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+  .side .totals .n { font-size: 30px; font-weight: 200; letter-spacing: -0.03em; line-height: 1.1; }
+  .side .totals .k { color: var(--dim); font-size: 13px; }
+  .side .turns { display: grid; gap: 6px; max-height: 60vh; overflow: auto; }
+  .side .row { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: baseline; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .side .row .n { color: var(--dim); }
+  .side .row .q { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .side .row .q b { color: var(--bone); font-weight: 500; }
+  .side .row .t { text-align: right; white-space: nowrap; }
+  .side .row.ev { grid-template-columns: 1fr; border-left: 3px solid var(--ice); background: var(--panel); white-space: normal; }
+  .side.left .row.ev { border-left-color: var(--amber); }
+  .side .row.ev.red { border-left-color: var(--red); }
+  .verdict { margin-top: 22px; font-size: 20px; font-weight: 300; max-width: 80ch; border-top: 1px solid var(--line); padding-top: 16px; }
+  .progress { height: 4px; background: var(--line); margin: 14px 0; border-radius: 2px; overflow: hidden; }
+  .progress b { display: block; height: 100%; background: var(--bone); width: 0; transition: width .4s; }
+
+  .vocab { display: flex; gap: 26px; flex-wrap: wrap; color: var(--dim); font-size: 14px; padding: 16px 32px 0; }
+  .vocab span b { color: var(--bone); font-weight: 500; }
+  @media (prefers-reduced-motion: reduce) { .pack .bar .seg, .progress b { transition: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The Backpack</h1>
+  <div class="lede">What a chat assistant actually receives when you press send, and why long conversations get expensive and forgetful.</div>
+  <div class="live" id="live"><i></i><span id="livetxt">checking the model…</span></div>
+</header>
+
+<div class="vocab">
+  <span><b>token</b> — about ¾ of a word</span>
+  <span><b>context window</b> — the backpack: everything the model gets in one go</span>
+  <span><b>compaction</b> — the assistant summarizes the chat and throws the transcript away</span>
+  <span><b>handoff</b> — you end the session and start fresh with a short note</span>
+</div>
+
+<nav role="tablist">
+  <button role="tab" aria-selected="true" data-tab="pack">1 · The backpack</button>
+  <button role="tab" aria-selected="false" data-tab="compact">2 · Compaction</button>
+  <button role="tab" aria-selected="false" data-tab="race">3 · Handoff, side by side</button>
+</nav>
+
+<div class="banner" id="banner">The model server isn't answering. On the box: <code>cd /srv/projects/vllm && docker compose logs -f</code></div>
+
+<!-- ===== tab 1 + 2 share the chat/backpack layout ===== -->
+<section class="tab on" id="tab-pack">
+  <p class="intro">The assistant remembers nothing between messages. <b>Every time you press send, the whole conversation goes with it.</b> Watch the right-hand side: you type a short line, the model receives the entire backpack. This demo's backpack is deliberately small (<span id="win1">8,192</span> tokens) so you can see it fill.</p>
+  <div class="duo">
+    <div>
+      <div class="chat" id="chat-pack"></div>
+      <div class="controls">
+        <button class="primary" id="next-pack">Next scripted message</button>
+        <input type="text" id="free-pack" placeholder="…or type your own message and press Enter">
+        <button id="reset-pack">Start over</button>
+      </div>
+    </div>
+    <aside class="pack" id="pack-pack"></aside>
+  </div>
+</section>
+
+<section class="tab" id="tab-compact">
+  <p class="intro">When the backpack is nearly full, the assistant <b>compacts</b>: it writes a summary of the conversation and throws the transcript away. The backpack shrinks. But a summary is a guess at what mattered. The later questions ask about details from the start; each answer gets a ✓ or ✗ for whether the detail survived. Open the compaction card to see why.</p>
+  <div class="duo">
+    <div>
+      <div class="chat" id="chat-compact"></div>
+      <div class="controls">
+        <button class="primary" id="next-compact">Next scripted message</button>
+        <button id="auto-compact">Run all 20</button>
+        <button id="reset-compact">Start over</button>
+      </div>
+    </div>
+    <aside class="pack" id="pack-compact"></aside>
+  </div>
+</section>
+
+<!-- ===== tab 3 ===== -->
+<section class="tab" id="tab-race">
+  <p class="intro">The same 20-message conversation, twice. Left: one long session that compacts when it must. Right: at message <span id="hturn">10</span> the user ends the session, the assistant writes a short <b>handoff note</b>, and a fresh session starts with only that note. Same questions, real numbers, nothing rigged.</p>
+  <div class="controls"><button class="primary" id="play">Play</button><span id="race-status" style="color:var(--dim)"></span></div>
+  <div class="progress"><b id="race-prog"></b></div>
+  <div class="race">
+    <div class="side left"><h3>One long session</h3><div class="totals" id="tot-left"></div><div class="turns" id="turns-left"></div></div>
+    <div class="side right"><h3>Handoff at message <span id="hturn2">10</span></h3><div class="totals" id="tot-right"></div><div class="turns" id="turns-right"></div></div>
+  </div>
+  <div class="verdict" id="verdict"></div>
+</section>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const fmt = n => (n ?? 0).toLocaleString();
+  const money = c => { const k = Object.keys(c || {}); return k.length ? `$${(c[k[0]]).toFixed(4)} (${k[0].toLowerCase()})` : ''; };
+  let cfg = { window_tokens: 8192, handoff_turn: 10 };
+
+  // ---- tabs
+  document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach(x => x.setAttribute('aria-selected', x === b));
+    document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('on', s.id === 'tab-' + b.dataset.tab));
+  }));
+
+  // ---- api
+  const api = async (path, body) => {
+    const r = await fetch('api/' + path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {});
+    if (!r.ok) { let d = ''; try { d = (await r.json()).detail; } catch (e) {} throw new Error(d || r.status); }
+    return r.json();
+  };
+  async function health() {
+    try {
+      cfg = await api('health');
+      const ok = cfg.vllm === 'ok';
+      $('live').classList.toggle('down', !ok); $('livetxt').textContent = ok ? `model: ${cfg.model} · window ${fmt(cfg.window_tokens)} tokens` : 'model server down';
+      $('banner').classList.toggle('on', !ok);
+      $('win1').textContent = fmt(cfg.window_tokens); $('hturn').textContent = $('hturn2').textContent = cfg.handoff_turn;
+      document.querySelectorAll('.primary').forEach(b => b.disabled = !ok);
+    } catch (e) { $('live').classList.add('down'); $('livetxt').textContent = 'demo service unreachable'; }
+  }
+
+  // ---- backpack widget
+  function packHTML() {
+    return `<div class="bar"><div class="limit" style="top:0"><span>backpack limit</span></div>
+        <div class="seg system"></div><div class="seg memory"></div><div class="seg transcript"></div><div class="seg message"></div></div>
+      <div class="big"><span class="typed">–</span><small>words you typed</small></div>
+      <div class="big"><span class="sent">–</span><small>tokens the model received</small></div>
+      <div class="legend"><span><i style="background:var(--dim)"></i>instructions</span><span><i style="background:var(--ice)"></i>summary / handoff note</span><span><i style="background:var(--amber)"></i>earlier messages</span><span><i style="background:var(--bone)"></i>this message</span></div>
+      <div class="total">sent so far <b class="total-sent">0</b> tokens · <b class="cost"></b></div>`;
+  }
+  function packUpdate(el, turn, state) {
+    const W = state.window_tokens || cfg.window_tokens;
+    const b = turn ? turn.breakdown : { system: 0, memory: 0, transcript: 0, message: 0 };
+    let bottom = 0;
+    for (const k of ['system', 'memory', 'transcript', 'message']) {
+      const h = Math.min(100, 100 * (b[k] || 0) / W);
+      const s = el.querySelector('.' + k); s.style.bottom = bottom + '%'; s.style.height = h + '%'; bottom += h;
+    }
+    el.classList.toggle('full', !!(turn && turn.event === 'over_limit'));
+    el.querySelector('.typed').textContent = turn ? fmt(turn.typed_words) : '–';
+    el.querySelector('.sent').textContent = turn ? fmt(turn.sent_tokens) : '–';
+    el.querySelector('.total-sent').textContent = fmt(state.totals.sent);
+    el.querySelector('.cost').textContent = money(state.totals.cost_usd);
+  }
+
+  // ---- chat rendering
+  function renderTurn(chat, t) {
+    if (t.event === 'compacted') chat.insertAdjacentHTML('beforeend', `<div class="event"><div class="t">Compacted — the assistant kept this and threw the rest away</div><div class="x">${esc(t.event_text)}</div></div>`);
+    chat.insertAdjacentHTML('beforeend', `<div class="msg user"><div class="who">you · ${t.typed_words} words</div><div class="body">${esc(t.user)}</div></div>`);
+    if (t.event === 'over_limit') {
+      chat.insertAdjacentHTML('beforeend', `<div class="event red"><div class="t">Backpack full — this message can't be sent</div><div class="x">${esc(t.event_text)}\nIn a real assistant this is where you'd hit "conversation too long", or it would compact on its own.</div></div>`);
+      return;
+    }
+    let badges = '';
+    for (const [id, ok] of Object.entries(t.remembered || {})) badges += `<span class="badge ${ok ? 'ok' : 'miss'}">${ok ? '✓' : '✗'} ${id}</span>`;
+    chat.insertAdjacentHTML('beforeend', `<div class="msg"><div class="who">assistant${badges}</div><div class="body">${esc(t.answer)}</div>
+      <div class="rcpt"><span>received <b>${fmt(t.sent_tokens)}</b> tokens</span><span>wrote <b>${fmt(t.new_tokens)}</b></span><span><b>${t.seconds}</b> s</span><span>${money(t.cost_usd)}</span></div></div>`);
+    chat.lastElementChild.scrollIntoView({ block: 'nearest' });
+  }
+  const esc = s => (s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  // ---- a chat tab controller (used for tab 1 and 2)
+  function chatTab(key, mode) {
+    const chat = $('chat-' + key), pack = $('pack-' + key);
+    pack.innerHTML = packHTML();
+    let sid = null, busy = false;
+    const buttons = () => [$('next-' + key), $('auto-' + key), $('reset-' + key), $('free-' + key)].filter(Boolean);
+    async function start() {
+      chat.innerHTML = ''; const r = await api('session', { mode }); sid = r.session_id; packUpdate(pack, null, r.state);
+    }
+    async function turn(text) {
+      if (busy) return; busy = true; buttons().forEach(b => b.disabled = true);
+      try {
+        if (!sid) await start();
+        const r = await api('turn', { session_id: sid, ...(text ? { text } : {}) });
+        renderTurn(chat, r.turn); packUpdate(pack, r.turn, r.state);
+        return r.turn;
+      } catch (e) {
+        chat.insertAdjacentHTML('beforeend', `<div class="event red"><div class="t">${esc(String(e.message))}</div></div>`);
+      } finally { busy = false; buttons().forEach(b => b.disabled = false); }
+    }
+    $('next-' + key).addEventListener('click', () => turn());
+    $('reset-' + key).addEventListener('click', () => start());
+    const free = $('free-' + key);
+    if (free) free.addEventListener('keydown', e => { if (e.key === 'Enter' && free.value.trim()) { const v = free.value.trim(); free.value = ''; turn(v); } });
+    const auto = $('auto-' + key);
+    if (auto) auto.addEventListener('click', async () => { for (let i = 0; i < 20; i++) { const t = await turn(); if (!t) break; } });
+    start().catch(() => {});
+  }
+
+  // ---- race
+  function totalsHTML(t, side) {
+    if (!t || !('sent' in t)) return '';
+    return `<div><div class="n">${fmt(t.sent)}</div><div class="k">tokens sent</div></div>
+      <div><div class="n">${t.remembered}/${t.asked}</div><div class="k">details remembered</div></div>
+      <div><div class="n">${t.seconds}</div><div class="k">seconds</div></div>
+      <div><div class="n">${money(t.cost_usd).split(' ')[0] || '–'}</div><div class="k">${Object.keys(t.cost_usd || {})[0] || ''}</div></div>`;
+  }
+  function turnsHTML(side) {
+    const evs = Object.fromEntries(side.events.map(e => [e.n + ':' + e.event, e]));
+    let h = '';
+    for (const t of side.turns) {
+      const ev = t.event && evs[t.n + ':' + t.event];
+      if (ev && ev.event === 'compacted') h += `<div class="row ev"><b>compacted before message ${t.n}</b><div class="x" style="color:var(--dim);font-size:13px;white-space:pre-wrap">${esc(ev.text)}</div></div>`;
+      const hand = side.events.find(e => e.event === 'handoff' && e.n === t.n - 1);
+      if (hand) h += `<div class="row ev"><b>session ended after message ${hand.n} — handoff note</b><div class="x" style="color:var(--dim);font-size:13px;white-space:pre-wrap">${esc(hand.text)}</div></div>`;
+      let badges = '';
+      for (const [id, ok] of Object.entries(t.remembered || {})) badges += `<span class="badge ${ok ? 'ok' : 'miss'}">${ok ? '✓' : '✗'} ${id}</span>`;
+      if (t.answer === null) h += `<div class="row ev red"><b>message ${t.n}: backpack full, not sent</b></div>`;
+      else h += `<div class="row"><span class="n">${t.n}</span><span class="q"><b>${fmt(t.sent_tokens)}</b> tokens received · ${esc(t.user)}</span><span class="t">${badges}</span></div>`;
+    }
+    return h;
+  }
+  let raceTimer = null;
+  $('play').addEventListener('click', async () => {
+    $('play').disabled = true; $('verdict').textContent = ''; $('race-status').textContent = 'running…';
+    try {
+      const { job_id } = await api('race/run');
+      clearInterval(raceTimer);
+      raceTimer = setInterval(async () => {
+        const j = await api('race/' + job_id);
+        for (const k of ['left', 'right']) { $('tot-' + k).innerHTML = totalsHTML(j.sides[k].totals, k); $('turns-' + k).innerHTML = turnsHTML(j.sides[k]); }
+        const done = j.sides.left.turns.length + j.sides.right.turns.length;
+        $('race-prog').style.width = (100 * done / (2 * j.script_turns)) + '%';
+        if (j.status !== 'running') {
+          clearInterval(raceTimer); $('play').disabled = false; $('race-status').textContent = j.status === 'done' ? 'done' : 'error: ' + j.error;
+          $('verdict').textContent = j.verdict || '';
+        }
+      }, 1000);
+    } catch (e) { $('race-status').textContent = 'error: ' + e.message; $('play').disabled = false; }
+  });
+
+  health().then(() => { chatTab('pack', 'endless'); chatTab('compact', 'compact'); });
+  setInterval(health, 15000);
+})();
+</script>
+</body>
+</html>
