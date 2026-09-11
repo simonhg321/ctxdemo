@@ -81,9 +81,9 @@
   @media (max-width: 860px) { .race { grid-template-columns: 1fr; } }
   .side h3 { margin: 0 0 4px; font-weight: 500; font-size: 18px; }
   .side.left h3 { color: var(--amber); } .side.right h3 { color: var(--ice); }
-  .side .totals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 10px 0 14px; }
+  .side .totals { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 10px 0 14px; }
   .side .totals div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
-  .side .totals .n { font-size: 30px; font-weight: 200; letter-spacing: -0.03em; line-height: 1.1; }
+  .side .totals .n { font-size: 26px; font-weight: 200; letter-spacing: -0.03em; line-height: 1.1; }
   .side .totals .k { color: var(--dim); font-size: 13px; }
   .side .turns { display: grid; gap: 6px; max-height: 60vh; overflow: auto; }
   .side .row { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: baseline; padding: 6px 8px; border-bottom: 1px solid var(--line); font-size: 14px; }
@@ -207,7 +207,7 @@
       <div class="big"><span class="typed">–</span><small>words you typed</small></div>
       <div class="big"><span class="sent">–</span><small>tokens the model received</small></div>
       <div class="legend"><span><i style="background:var(--dim)"></i>instructions</span><span><i style="background:var(--ice)"></i>summary / handoff note</span><span><i style="background:var(--amber)"></i>earlier messages</span><span><i style="background:var(--bone)"></i>this message</span></div>
-      <div class="total">sent so far <b class="total-sent">0</b> tokens · <b class="cost"></b></div>`;
+      <div class="total">so far: you typed <b class="total-typed">0</b> words · the model received <b class="total-sent">0</b> tokens · <b class="cost"></b></div>`;
   }
   function packUpdate(el, turn, state) {
     const W = state.window_tokens || cfg.window_tokens;
@@ -221,6 +221,7 @@
     el.querySelector('.typed').textContent = turn ? fmt(turn.typed_words) : '–';
     el.querySelector('.sent').textContent = turn ? fmt(turn.sent_tokens) : '–';
     el.querySelector('.total-sent').textContent = fmt(state.totals.sent);
+    el.querySelector('.total-typed').textContent = fmt(state.totals.typed);
     el.querySelector('.cost').textContent = money(state.totals.cost_usd);
   }
 
@@ -275,7 +276,8 @@
   // ---- race
   function totalsHTML(t, side) {
     if (!t || !('sent' in t)) return '';
-    return `<div><div class="n">${fmt(t.sent)}</div><div class="k">tokens sent</div></div>
+    return `<div><div class="n">${fmt(t.typed)}</div><div class="k">words you typed</div></div>
+      <div><div class="n">${fmt(t.sent)}</div><div class="k">tokens the model received</div></div>
       <div><div class="n">${t.remembered}/${t.asked}</div><div class="k">details remembered</div></div>
       <div><div class="n">${t.seconds}</div><div class="k">seconds</div></div>
       <div><div class="n">${money(t.cost_usd).split(' ')[0] || '–'}</div><div class="k">${Object.keys(t.cost_usd || {})[0] || ''}</div></div>`;

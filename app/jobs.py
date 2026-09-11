@@ -51,7 +51,8 @@ class RaceJob:
         # handoff/summary calls are charged inside the session totals; take the max seen
         last = turns[-1] if turns else {"total_sent": 0, "total_new": 0}
         sent = max(sent, last["total_sent"]); new = max(new, last["total_new"])
-        return {"sent": sent, "new": new, "seconds": round(sum(t["seconds"] for t in turns), 1),
+        return {"sent": sent, "new": new, "typed": sum(t["typed_words"] for t in turns),
+                "seconds": round(sum(t["seconds"] for t in turns), 1),
                 "remembered": got, "asked": asked,
                 "cost_usd": {k: round((sent * p["in"] + new * p["out"]) / 1e6, 4) for k, p in self.cfg.prices.items()},
                 "failed_turns": sum(1 for t in turns if t["answer"] is None)}

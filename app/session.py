@@ -59,6 +59,7 @@ class Session:
         self.transcript: list[dict] = []          # user/assistant messages since the last memory block
         self.turns: list[TurnResult] = []
         self.carried_n, self.carried_sent, self.carried_new = carried
+        self.carried_typed = 0
         self.script_pos = 0
         self.events: list[dict] = []              # {"n", "event", "text"} for the UI
 
@@ -146,6 +147,10 @@ class Session:
     def total_new(self) -> int:
         return self.carried_new + sum(t.new_tokens for t in self.turns)
 
+    @property
+    def total_typed(self) -> int:
+        return self.carried_typed + sum(t.typed_words for t in self.turns)
+
     # ---- end this session on purpose, hand off to a fresh one
     def handoff(self) -> HandoffResult:
         r = self.vllm.chat([{"role": "user", "content": HANDOFF_PROMPT + self._transcript_text()}],
@@ -157,12 +162,13 @@ class Session:
                       memory=("Handoff note from my previous session", r.text),
                       carried=(self.n, self.total_sent, self.total_new))
         new.script_pos = self.script_pos
+        new.carried_typed = self.total_typed
         new.events.append({"n": self.n, "event": "handoff", "text": r.text})
         return HandoffResult(note=r.text, note_tokens=self.vllm.count(r.text), new_session=new)
 
     def state(self) -> dict:
         return {"id": self.id, "mode": self.mode, "n": self.n, "turns": [t.to_dict() for t in self.turns],
                 "events": self.events, "memory": {"label": self.memory[0], "text": self.memory[1]} if self.memory else None,
-                "totals": {"sent": self.total_sent, "new": self.total_new,
+                "totals": {"sent": self.total_sent, "new": self.total_new, "typed": self.total_typed,
                            "cost_usd": self._cost(self.total_sent, self.total_new)},
                 "window_tokens": self.cfg.window_tokens, "next_would_send": self.vllm.count_messages(self.messages)}
