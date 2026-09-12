@@ -44,7 +44,7 @@ def test_race_completes_with_verdict(client, fake, cfg):
     cfg.window_tokens = 100000
     fake.responses = None
     everything = "Saturday October 24th, Herak 218, $1,850, Dr. Priya Raman, vegan, HDMI 1 port 2 is dead, 10am, 40 t-shirts Spokane Print Co, BULLDOG24, GPU wall dashboard, 12 pizzas Flying Goat, October 9th"
-    fake.chat = lambda messages, max_tokens, _f=fake: __import__("app.vllm", fromlist=["ChatResult"]).ChatResult(
+    fake.chat = lambda messages, max_tokens, tools=None, _f=fake: __import__("app.vllm", fromlist=["ChatResult"]).ChatResult(
         text=everything, prompt_tokens=_f.count_messages(messages), completion_tokens=40, seconds=0.0)
     jid = client.post("/api/race/run").json()["job_id"]
     j = client.get(f"/api/race/{jid}").json()
@@ -54,3 +54,34 @@ def test_race_completes_with_verdict(client, fake, cfg):
         assert j["sides"][side]["totals"]["remembered"] == j["sides"][side]["totals"]["asked"] == 24
     assert [e["n"] for e in j["sides"]["right"]["events"] if e["event"] == "handoff"] == [10, 20]
     assert "Handoff every" in j["verdict"]
+
+
+def test_look_reads_board_dedupes_and_commands(cfg):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    from tests.conftest import FakeVLLM
+    fake = FakeVLLM(looks=["What's the weather in Spokane?", "Whats the weather in Spokane", "NONE", "COMPACT", "COMPACT", "How tall is Everest?"])
+    c = TestClient(create_app(vllm=fake, cfg=cfg, vision=fake, tools=object()))
+    sid = c.post("/api/session", json={"mode": "compact", "tools": True, "board": True}).json()["session_id"]
+    look = lambda: c.post("/api/look", json={"session_id": sid, "image": "QUJD"}).json()
+    r = look(); assert r["new"] and r["question"] == "What's the weather in Spokane?" and r["read_tokens"] == 1500
+    r = look(); assert not r["new"] and r["question"] is None          # same board, slightly different read
+    r = look(); assert not r["new"] and r["read"] == "NONE"
+    r = look(); assert r["new"] and r["command"] == "COMPACT"
+    r = look(); assert not r["new"]                                     # still holding COMPACT up
+    r = look(); assert r["new"] and r["question"] == "How tall is Everest?"
+
+
+def test_session_flags_pick_persona_and_tools(cfg):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    from app.session import SYSTEM_BOARD
+    from tests.conftest import FakeVLLM
+    fake = FakeVLLM()
+    app = create_app(vllm=fake, cfg=cfg, vision=fake, tools=object())
+    c = TestClient(app)
+    sid = c.post("/api/session", json={"mode": "endless", "tools": True, "board": True}).json()["session_id"]
+    s = app.state.sessions[sid]
+    assert s.system == SYSTEM_BOARD and s.tools is not None
+    sid2 = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
+    assert app.state.sessions[sid2].tools is None

@@ -28,3 +28,31 @@ def test_count_uses_tokenize():
     v = VLLM("http://x", "m", transport=httpx.MockTransport(handler))
     assert v.count("x") == 7
     assert v.count_messages([{"role": "user", "content": "x"}]) == 9
+
+
+def test_count_falls_back_to_estimate_without_tokenize():
+    def handler(req):
+        if req.url.path == "/tokenize": return httpx.Response(404)
+        return httpx.Response(200, json={"data": []})
+    v = VLLM("http://x", "m", transport=httpx.MockTransport(handler))
+    assert v.count("hello there world, this is text") > 0 and v.exact is False
+    assert v.count_messages([{"role": "user", "content": "hello"}]) >= 5
+    assert v.health() is True   # /v1/models answers even though /health is not 200
+
+
+def test_chat_returns_tool_calls_and_look_sends_image():
+    seen = []
+    def handler(req):
+        j = json.loads(req.content); seen.append(j)
+        if "tools" in j:
+            return httpx.Response(200, json={"choices": [{"message": {"content": None, "tool_calls": [
+                {"id": "c1", "type": "function", "function": {"name": "web_search", "arguments": '{"query":"x"}'}}]}}],
+                "usage": {"prompt_tokens": 3, "completion_tokens": 2}})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "READ ME"}}], "usage": {"prompt_tokens": 1500, "completion_tokens": 3}})
+    v = VLLM("http://x", "m", transport=httpx.MockTransport(handler))
+    r = v.chat([{"role": "user", "content": "hi"}], 5, tools=[{"type": "function", "function": {"name": "web_search"}}])
+    assert r.text == "" and r.tool_calls[0]["function"]["name"] == "web_search"
+    r2 = v.look("QUJD", "read it")
+    assert r2.text == "READ ME" and r2.prompt_tokens == 1500
+    parts = seen[1]["messages"][0]["content"]
+    assert parts[0] == {"type": "text", "text": "read it"} and parts[1]["image_url"]["url"].startswith("data:image/jpeg;base64,QUJD")

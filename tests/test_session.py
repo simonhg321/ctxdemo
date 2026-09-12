@@ -66,3 +66,35 @@ def test_cost_uses_prices(fake, cfg):
     fake.responses = ["one two"]
     t = s.turn("hello there")
     assert t.cost_usd == {"Test": round((t.sent_tokens * 1.0 + 2 * 2.0) / 1e6, 5)}
+
+
+def test_tool_loop_runs_tools_and_sums_tokens(cfg):
+    from app.vllm import ChatResult
+    from app.session import Session
+    from tests.conftest import FakeVLLM
+    class FakeTools:
+        def __init__(self): self.calls = []
+        def run(self, name, args): self.calls.append((name, args)); return "1. Spokane weather: sunny 71F"
+    call = ChatResult(text="", prompt_tokens=0, completion_tokens=2, seconds=0.1,
+                      tool_calls=[{"id": "c1", "type": "function", "function": {"name": "web_search", "arguments": '{"query":"spokane weather"}'}}])
+    fake = FakeVLLM(responses=[call, "Sunny and 71F in Spokane (web)."])
+    tools = FakeTools()
+    s = Session("endless", fake, cfg, tools=tools)
+    tr = s.turn("weather in spokane?")
+    assert tools.calls == [("web_search", '{"query":"spokane weather"}')]
+    assert tr.answer.startswith("Sunny") and tr.tool_uses[0]["name"] == "web_search"
+    assert fake.calls[0]["tools"] is not None and len(fake.calls) == 2
+    # the second call carried the tool result in the backpack, and the turn charges both calls
+    assert fake.calls[1]["messages"][-1]["role"] == "tool"
+    assert tr.sent_tokens == sum(fake.count_messages(c["messages"]) for c in fake.calls)
+    roles = [m["role"] for m in s.transcript]
+    assert roles == ["user", "assistant", "tool", "assistant"]
+    assert "[called web_search]" in s._transcript_text()
+
+
+def test_no_tools_means_no_tools_param(cfg):
+    from app.session import Session
+    from tests.conftest import FakeVLLM
+    fake = FakeVLLM()
+    Session("endless", fake, cfg).turn("hi")
+    assert fake.calls[0]["tools"] is None

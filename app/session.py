@@ -6,11 +6,18 @@ import uuid
 from dataclasses import dataclass, field, asdict
 from typing import Literal
 from .config import Config
+from .vllm import text_of
+from .tools import TOOLS
+
+MAX_TOOL_ROUNDS = 3
 
 Mode = Literal["endless", "compact", "handoff"]
 
 SYSTEM = ("You are a helpful assistant helping plan a university lab open house. "
           "Answer briefly and concretely. Use the details the user has given you.")
+SYSTEM_BOARD = ("You are a friendly assistant in a university lab. People write questions on a whiteboard and hold it up "
+                "to a camera; you answer for a wall display. Keep answers short (2-4 sentences), plain, and concrete. "
+                "Use web_search for anything current (weather, news, scores) and say where the answer came from.")
 SUMMARY_PROMPT = ("Summarize the conversation below so that an assistant can continue it. "
                   "List EVERY concrete fact exactly as stated (dates, names, numbers, codes, places, rules) — do not paraphrase or drop any. "
                   "Plain text, no preamble.\n\nCONVERSATION:\n")
@@ -34,6 +41,7 @@ class TurnResult:
     cost_usd: dict[str, float]
     total_sent: int
     total_new: int
+    tool_uses: list[dict] = field(default_factory=list)   # {name, args, result} per tool call this turn
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -48,8 +56,10 @@ class HandoffResult:
 
 class Session:
     def __init__(self, mode: Mode, vllm, cfg: Config, system_prompt: str = SYSTEM,
-                 memory: tuple[str, str] | None = None, carried: tuple[int, int, int] = (0, 0, 0)):
+                 memory: tuple[str, str] | None = None, carried: tuple[int, int, int] = (0, 0, 0),
+                 tools=None):
         self.id = uuid.uuid4().hex[:12]
+        self.tools = tools                        # a Tools instance, or None = no web access
         self.mode: Mode = mode
         self.vllm = vllm
         self.cfg = cfg
@@ -62,6 +72,7 @@ class Session:
         self.carried_typed = 0
         self.script_pos = 0
         self.events: list[dict] = []              # {"n", "event", "text"} for the UI
+        self.last_board: str = ""                 # last question read off the whiteboard (dedupe)
 
     # ---- what would be sent next
     @property
@@ -82,14 +93,17 @@ class Session:
         if self.memory:
             parts.append(f"[{self.memory[0]}]\n{self.memory[1]}")
         for m in self.transcript:
-            parts.append(f"{m['role'].upper()}: {m['content']}")
+            body = text_of(m.get("content"))
+            if m.get("tool_calls"):
+                body = (body + " " if body else "") + "[called " + ", ".join(tc["function"]["name"] for tc in m["tool_calls"]) + "]"
+            parts.append(f"{m['role'].upper()}: {body}")
         return "\n\n".join(parts)
 
     def _breakdown(self, user_text: str) -> dict[str, int]:
         c = self.vllm.count
         return {"system": c(self.system),
                 "memory": c(self.memory[1]) if self.memory else 0,
-                "transcript": sum(c(m["content"]) for m in self.transcript),
+                "transcript": sum(c(text_of(m.get("content"))) for m in self.transcript),
                 "message": c(user_text)}
 
     def _cost(self, sent: int, new: int) -> dict[str, float]:
@@ -127,13 +141,29 @@ class Session:
             return tr
 
         breakdown = self._breakdown(user_text)
-        r = self.vllm.chat(candidate, self.cfg.answer_max_tokens)
+        tools = TOOLS if self.tools else None
         self.transcript.append({"role": "user", "content": user_text})
+        sent = new = 0
+        secs = 0.0
+        uses: list[dict] = []
+        r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools)
+        rounds = 0
+        while r.tool_calls and self.tools and rounds < MAX_TOOL_ROUNDS:
+            rounds += 1
+            sent += r.prompt_tokens; new += r.completion_tokens; secs += r.seconds
+            self.transcript.append({"role": "assistant", "content": r.text or None, "tool_calls": r.tool_calls})
+            for tc in r.tool_calls:
+                fn = tc.get("function", {})
+                result = self.tools.run(fn.get("name", ""), fn.get("arguments", "{}"))
+                uses.append({"name": fn.get("name"), "args": fn.get("arguments"), "result": result})
+                self.transcript.append({"role": "tool", "tool_call_id": tc.get("id", f"call_{rounds}"), "content": result})
+            r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools)
+        sent += r.prompt_tokens; new += r.completion_tokens; secs += r.seconds
         self.transcript.append({"role": "assistant", "content": r.text})
-        tr = TurnResult(n=n, user=user_text, answer=r.text, sent_tokens=r.prompt_tokens, new_tokens=r.completion_tokens,
-                        typed_words=typed, seconds=round(r.seconds, 2), breakdown=breakdown,
-                        event=event, event_text=event_text, cost_usd=self._cost(r.prompt_tokens, r.completion_tokens),
-                        total_sent=self.total_sent + r.prompt_tokens, total_new=self.total_new + r.completion_tokens)
+        tr = TurnResult(n=n, user=user_text, answer=r.text, sent_tokens=sent, new_tokens=new,
+                        typed_words=typed, seconds=round(secs, 2), breakdown=breakdown,
+                        event=event, event_text=event_text, cost_usd=self._cost(sent, new),
+                        total_sent=self.total_sent + sent, total_new=self.total_new + new, tool_uses=uses)
         self.turns.append(tr)
         if event:
             self.events.append({"n": n, "event": event, "text": event_text})
@@ -160,7 +190,7 @@ class Session:
         self.carried_new += r.completion_tokens
         new = Session(self.mode, self.vllm, self.cfg, self.system,
                       memory=("Handoff note from my previous session", r.text),
-                      carried=(self.n, self.total_sent, self.total_new))
+                      carried=(self.n, self.total_sent, self.total_new), tools=self.tools)
         new.script_pos = self.script_pos
         new.carried_typed = self.total_typed
         new.events.append({"n": self.n, "event": "handoff", "text": r.text})
