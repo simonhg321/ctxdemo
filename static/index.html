@@ -558,6 +558,28 @@
     if (location.hash === '#map') { document.querySelector('nav button[data-tab=map]').click(); }
     $('handoff-map').addEventListener('click', handoff);
     $('compact-map').addEventListener('click', compactNow);
+    // replay: a canned 12-turn chat with pre-baked graph deltas, so the map can be tuned without talking for ten minutes
+    $('replay-map').addEventListener('click', async () => {
+      if (busy) return; busy = true; $('replay-map').disabled = true;
+      try {
+        const rp = await (await fetch('static/replay.json')).json();
+        chat.innerHTML = ''; ctxMap.clear();
+        const fakeState = { window_tokens: cfg.board_window || 4096, totals: { sent: 0, typed: 0, cost_usd: {} } };
+        let n = 0;
+        for (const t of rp.turns) {
+          await new Promise(r => setTimeout(r, 2500));
+          if (t.handoff) { note('', 'Session ended — handoff note. A fresh session starts with only this.', t.note); ctxMap.handoff(t.graph_seed); continue; }
+          n++;
+          const turn = { n, user: t.user, answer: t.answer, typed_words: t.user.split(/\s+/).length, sent_tokens: t.sent_tokens || 0, new_tokens: t.new_tokens || 0,
+                         seconds: 0, cost_usd: {}, breakdown: t.breakdown || { system: 80, memory: t.event ? 60 : 0, transcript: Math.max(0, (t.sent_tokens || 0) - 100), message: 20 },
+                         event: t.event || null, event_text: t.event_text || null, tool_uses: [], remembered: {} };
+          fakeState.totals.sent += turn.sent_tokens; fakeState.totals.typed += turn.typed_words;
+          renderTurn(chat, turn); packAll(turn, fakeState); ctxMap.applyDelta(t.graph_delta);
+        }
+      } catch (e) { note('red', 'replay: ' + e.message); }
+      finally { busy = false; $('replay-map').disabled = false; }
+    });
+    if (replaying) setTimeout(() => $('replay-map').click(), 600);
     $('cam-stop').addEventListener('click', () => { clearTimeout(timer); clearTimeout(cueTimer); awake = false; setState('board says'); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; video.srcObject = null; $('cam-start').hidden = false; $('cam-start').disabled = false; $('cam-stop').disabled = true; cam.classList.remove('new', 'awake'); });
     $('reset-board').addEventListener('click', () => start().catch(e => note('red', String(e.message))));
     $('handoff-board').addEventListener('click', handoff);
