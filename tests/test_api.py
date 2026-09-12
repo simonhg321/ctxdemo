@@ -83,6 +83,7 @@ def test_session_flags_pick_persona_and_tools(cfg):
     sid = c.post("/api/session", json={"mode": "endless", "tools": True, "board": True}).json()["session_id"]
     s = app.state.sessions[sid]
     assert s.system == SYSTEM_BOARD and s.tools is not None
+    assert s.cfg.window_tokens == cfg.board_window and s.cfg.window_tokens != cfg.window_tokens
     sid2 = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
     assert app.state.sessions[sid2].tools is None
 

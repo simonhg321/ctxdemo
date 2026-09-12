@@ -17,6 +17,7 @@ class Config:
     model: str = "qwen3-8b"
     answer_max_tokens: int = 400
     race_long_window: int = 30000   # the 'one long session' side: a big-context assistant that never compacts
+    board_window: int = 4096        # the whiteboard tab: search results are ~700 tokens each, give it room
     vllm_url: str = "http://127.0.0.1:8100"
     vision_url: str = ""                 # server that reads the whiteboard; defaults to vllm_url
     vision_model: str = ""               # defaults to model (fine when the chat model can see, e.g. qwen3-vl)

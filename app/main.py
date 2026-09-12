@@ -10,6 +10,7 @@ from .vllm import VLLM
 from .tools import Tools
 from . import grader
 import difflib, re
+from dataclasses import replace
 
 READ_PROMPT = ("A person is holding a small whiteboard up to the camera. Transcribe exactly what is written on it, "
                "as one line of plain text. If there is no readable writing, reply with the single word NONE.")
@@ -74,7 +75,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None) -> FastAPI:
     def health():
         return {"vllm": "ok" if vllm.health() else "down", "model": cfg.model, "window_tokens": cfg.window_tokens,
                 "vision": "ok" if vision.health() else "down", "vision_model": getattr(vision, "model", cfg.model),
-                "exact_counts": getattr(vllm, "exact", True),
+                "exact_counts": getattr(vllm, "exact", True), "board_window": cfg.board_window,
                 "compact_at": cfg.compact_at, "handoff_turn": cfg.handoff_turn, "script_turns": len(scr.turns),
                 "prices": cfg.prices}
 
@@ -86,8 +87,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None) -> FastAPI:
     def new_session(req: NewSession = Body(...)):
         if req.mode not in ("endless", "compact", "handoff"):
             raise HTTPException(400, "mode must be endless|compact|handoff")
-        s = Session(req.mode, vllm, cfg, system_prompt=SYSTEM_BOARD if req.board else SYSTEM,
-                    tools=tools if req.tools else None)
+        s = Session(req.mode, vllm, replace(cfg, window_tokens=cfg.board_window) if req.board else cfg,
+                    system_prompt=SYSTEM_BOARD if req.board else SYSTEM, tools=tools if req.tools else None)
         sessions[s.id] = s
         return {"session_id": s.id, "state": s.state()}
 

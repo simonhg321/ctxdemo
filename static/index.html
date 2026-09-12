@@ -187,7 +187,7 @@
 
 <!-- ===== tab 4 ===== -->
 <section class="tab" id="tab-board">
-  <p class="intro">Write a question on the whiteboard and hold it up to the camera. The assistant reads it, answers on the wall, and can <b>search the web</b>. Every question goes into the same backpack, and the search results do too, so watch it fill. Reading the board costs tokens as well, shown under the camera; that cost is not carried forward.</p>
+  <p class="intro">Write a question on the whiteboard and hold it up to the camera. The assistant reads it, answers on the wall, and can <b>search the web</b>. Every question goes into the same backpack, and the search results do too, so watch it fill. This tab's backpack is <span id="winb">4,096</span> tokens, bigger than tab 1, because one web search alone is about 700. Reading the board costs tokens as well, shown under the camera; that cost is not carried forward.</p>
   <div class="duo">
     <div>
       <div class="cam" id="cam"><video id="video" autoplay playsinline muted></video>
@@ -233,7 +233,7 @@
       const ok = cfg.vllm === 'ok';
       $('live').classList.toggle('down', !ok); $('livetxt').textContent = ok ? `model: ${cfg.model} · window ${fmt(cfg.window_tokens)} tokens${cfg.exact_counts === false ? ' · counts before sending are estimates' : ''}` : 'model server down';
       $('banner').classList.toggle('on', !ok);
-      $('win1').textContent = fmt(cfg.window_tokens); $('hturn').textContent = $('hturn2').textContent = cfg.handoff_turn;
+      $('win1').textContent = fmt(cfg.window_tokens); $('winb').textContent = fmt(cfg.board_window || 4096); $('hturn').textContent = $('hturn2').textContent = cfg.handoff_turn;
       document.querySelectorAll('.primary').forEach(b => b.disabled = !ok);
     } catch (e) { $('live').classList.add('down'); $('livetxt').textContent = 'demo service unreachable'; }
   }

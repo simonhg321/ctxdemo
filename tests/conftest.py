@@ -35,5 +35,5 @@ def fake(): return FakeVLLM()
 
 @pytest.fixture
 def cfg():
-    return Config(window_tokens=400, compact_at=0.8, summary_max_tokens=40, handoff_max_tokens=30, handoff_turn=10,
+    return Config(window_tokens=400, compact_at=0.8, summary_max_tokens=40, handoff_max_tokens=30, handoff_turn=10, board_window=1600,
                   prices={"Test": {"in": 1.0, "out": 2.0}})
