@@ -487,7 +487,13 @@
       try {
         if (!sid) await start();
         const b64 = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result.split(',')[1]); fr.readAsDataURL(blob); });
-        const r = await api('hear', { session_id: sid, audio: b64, mime: blob.type || 'audio/webm' });
+        let r;
+        try { r = await api('hear', { session_id: sid, audio: b64, mime: blob.type || 'audio/webm' }); }
+        catch (e) {
+          if (!/no such session/.test(e.message)) throw e;
+          await start();                                  // server restarted under us: new session, resend the clip
+          r = await api('hear', { session_id: sid, audio: b64, mime: blob.type || 'audio/webm' });
+        }
         if (r.woke) { cam.classList.add('awake'); }
         if (r.question) { micState(`heard: “${r.heard}”`); note('', `Heard: “${r.heard}”`); await turn(r.question); micState(`listening… ${r.listen_left} s`); }
         else if (r.listening) micState(r.woke ? 'listening… ask your question' : `listening… ${r.listen_left} s · heard “${r.heard}”`);
