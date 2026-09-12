@@ -42,6 +42,15 @@
   /* chat + backpack layout */
   .duo { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 32px; align-items: start; }
   @media (max-width: 860px) { .duo { grid-template-columns: 1fr; } }
+  /* tab 5: the map is the stage, the chat is the evidence */
+  .mapwrap { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; height: calc(100vh - 150px); min-height: 480px; }
+  #map { width: 100%; height: 100%; display: block; background: var(--ground); border: 1px solid var(--line); border-radius: 6px; }
+  .mapside { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; gap: 10px; min-height: 0; }
+  .mapside .chat { max-height: none; min-height: 0; }
+  .cam.mini video { max-height: 130px; }
+  .micline { color: var(--dim); font-size: 13px; display: flex; gap: 8px; align-items: center; }
+  #tab-map { padding-bottom: 16px; }
+  @media (max-width: 900px) { .mapwrap { grid-template-columns: 1fr; height: auto; } #map { height: 60vh; } }
   .chat { display: grid; gap: 10px; align-content: start; max-height: 62vh; overflow-y: auto; padding-right: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 12px; min-height: 240px; }
   .msg { display: grid; gap: 4px; max-width: 70ch; }
   .msg .who { color: var(--dim); font-size: 13px; }
@@ -142,6 +151,7 @@
   <button role="tab" aria-selected="false" data-tab="compact">2 · Compaction</button>
   <button role="tab" aria-selected="false" data-tab="race">3 · Handoff, side by side</button>
   <button role="tab" aria-selected="false" data-tab="board">4 · The whiteboard</button>
+  <button role="tab" aria-selected="false" data-tab="map">5 · The map</button>
 </nav>
 
 <div class="banner" id="banner">The model server isn't answering. On the box: <code>cd /srv/projects/vllm && docker compose logs -f</code></div>
@@ -213,6 +223,23 @@
   </div>
 </section>
 
+<!-- ===== tab 5: the same session as tab 4, drawn as a map ===== -->
+<section class="tab" id="tab-map">
+  <div class="mapwrap">
+    <canvas id="map"></canvas>
+    <aside class="mapside">
+      <div class="cam mini"><video id="video-map" autoplay playsinline muted></video>
+        <div class="read"><span id="cue-state-map">board says</span><b id="read-txt-map">–</b></div></div>
+      <div class="micline"><i class="lvl" id="mic-lvl-map"></i> <span id="mic-state-map"></span></div>
+      <div class="chat" id="chat-map"></div>
+      <div class="pack" id="pack-map"></div>
+      <div class="controls"><button id="replay-map">Replay a canned chat</button><button id="compact-map">Compact</button><button id="handoff-map">Hand off</button></div>
+    </aside>
+  </div>
+</section>
+
+<script src="static/vendor/d3.min.js"></script>
+<script src="static/map.js"></script>
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -367,8 +394,16 @@
 
   // ---- the whiteboard (tab 4): camera → /api/look → /api/turn
   function boardTab() {
-    const chat = $('chat-board'), pack = $('pack-board'), cam = $('cam'), video = $('video');
-    pack.innerHTML = packHTML();
+    const cam = $('cam'), video = $('video');
+    // tab 4 and tab 5 show the same session: every render goes to both columns, the map listens on top.
+    const chats = [$('chat-board'), $('chat-map')], packs = [$('pack-board'), $('pack-map')];
+    packs.forEach(p => p.innerHTML = packHTML());
+    const chat = { insertAdjacentHTML: (w, h) => chats.forEach(c => c.insertAdjacentHTML(w, h)),
+                   set innerHTML(v) { chats.forEach(c => c.innerHTML = v); },
+                   get scrollHeight() { return 0; }, set scrollTop(v) { chats.forEach(c => c.scrollTop = c.scrollHeight); } };
+    const packAll = (turn, state) => packs.forEach(p => packUpdate(p, turn, state));
+    const readTxt = v => { $('read-txt').textContent = v; $('read-txt-map').textContent = v; };
+    ctxMap.init($('map'));
     let sid = null, busy = false, stream = null, timer = null, readTotal = 0;
     // ---- the cue: a strip of green tape on the board. Checked in the browser every second, costs nothing.
     const CUE_ON = 1.0, CUE_TICKS_WAKE = 2, CUE_TICKS_SLEEP = 4;     // % of thumbnail pixels that are tape-green
@@ -383,7 +418,7 @@
       }
       return 100 * hit / (d.length / 4);
     }
-    function setState(t) { $('cue-state').textContent = t; }
+    function setState(t) { $('cue-state').textContent = t; $('cue-state-map').textContent = t; }
     function cueTick() {
       if (!stream) return;
       if (!$('board-cue').checked) { if (!awake) wake(); cueTimer = setTimeout(cueTick, 1000); return; }
@@ -396,19 +431,19 @@
       cueTimer = setTimeout(cueTick, 1000);
     }
     function wake() { awake = true; cam.classList.add('awake'); setState('board says'); clearTimeout(timer); look(); }
-    function sleep() { awake = false; cam.classList.remove('awake', 'new'); clearTimeout(timer); timer = null; setState('waiting for the board'); $('read-txt').textContent = '–'; }
+    function sleep() { awake = false; cam.classList.remove('awake', 'new'); clearTimeout(timer); timer = null; setState('waiting for the board'); readTxt('–'); }
     const note = (cls, t, x) => { chat.insertAdjacentHTML('beforeend', `<div class="event ${cls}"><div class="t">${esc(t)}</div>${x ? `<div class="x">${esc(x)}</div>` : ''}</div>`); chat.scrollTop = chat.scrollHeight; };
     async function start() {
-      chat.innerHTML = ''; readTotal = 0; $('read-txt').textContent = '–'; $('read-cost').textContent = '';
+      chat.innerHTML = ''; readTotal = 0; readTxt('–'); $('read-cost').textContent = '';
       const r = await api('session', { mode: $('board-mode').value, tools: $('board-tools').checked, board: true });
-      sid = r.session_id; packUpdate(pack, null, r.state);
+      sid = r.session_id; packAll(null, r.state); ctxMap.seed(r.state.graph);
     }
     async function turn(text) {
       if (busy) return; busy = true; cam.classList.add('thinking');
       try {
         if (!sid) await start();
         const r = await api('turn', { session_id: sid, text });
-        renderTurn(chat, r.turn); packUpdate(pack, r.turn, r.state);
+        renderTurn(chat, r.turn); packAll(r.turn, r.state); ctxMap.applyDelta(r.turn.graph_delta);
       } catch (e) { note('red', String(e.message)); }
       finally { busy = false; cam.classList.remove('thinking'); }
     }
@@ -417,12 +452,12 @@
       try {
         const r = await api('handoff', { session_id: sid }); sid = r.session_id;
         note('', `Session ended — handoff note (${fmt(r.note_tokens)} tokens). A fresh session starts with only this.`, r.note);
-        packUpdate(pack, null, r.state);
+        packAll(null, r.state); ctxMap.handoff(r.graph_seed);
       } catch (e) { note('red', String(e.message)); } finally { busy = false; }
     }
     async function compactNow() {
       if (busy || !sid) return; busy = true;
-      try { const r = await api('compact', { session_id: sid }); note('', 'Compacted — the assistant kept this and threw the rest away', r.summary); packUpdate(pack, null, r.state); }
+      try { const r = await api('compact', { session_id: sid }); note('', 'Compacted — the assistant kept this and threw the rest away', r.summary); packAll(null, r.state); ctxMap.applySurvive(r.graph_survive); }
       catch (e) { note('red', String(e.message)); } finally { busy = false; }
     }
     function snapshot() {
@@ -438,21 +473,22 @@
         if (!sid) await start();
         const r = await api('look', { session_id: sid, image: snapshot() });
         readTotal += r.read_tokens;
-        $('read-txt').textContent = r.read === 'NONE' ? '(nothing readable)' : r.read;
+        readTxt(r.read === 'NONE' ? '(nothing readable)' : r.read);
         $('read-cost').textContent = `reading the board: ${fmt(r.read_tokens)} tokens · ${r.seconds} s · ${fmt(readTotal)} so far`;
         cam.classList.toggle('new', !!r.new);
         if (r.new && r.question) { note('', `Read off the board: “${r.question}”`); await turn(r.question); }
         else if (r.command === 'COMPACT') await compactNow();
         else if (r.command === 'HANDOFF') await handoff();
         else if (r.command === 'RESET') await start();
-      } catch (e) { $('read-txt').textContent = 'read failed: ' + e.message; }
+      } catch (e) { readTxt('read failed: ' + e.message); }
       if (awake) timer = setTimeout(look, 4000);
     }
     // ---- the microphone: browser watches loudness, records one utterance, sends it to local Whisper.
     // Nothing is sent while the room is quiet. Only "hi compact demo" opens the question window.
     let mic = null, rec = null, chunks = [], recording = false, quietMs = 0, loudTicks = 0, recStart = 0, floor = 0.01, micBusy = false;
     const MIC_TICK = 100, QUIET_END_MS = 1200, MAX_CLIP_MS = 12000;
-    const micState = t => { $('mic-state').textContent = t; };
+    const micState = t => { $('mic-state').textContent = t; $('mic-state-map').textContent = t; };
+    const lvls = [$('mic-lvl'), $('mic-lvl-map')];
     async function micStart() {
       if (mic || !$('board-mic').checked || cfg.ears === 'none') { if (cfg.ears === 'none') micState('no speech server'); return; }
       try {
@@ -472,13 +508,13 @@
         const rms = Math.sqrt(sum / buf.length);
         if (!recording) floor = floor * 0.98 + rms * 0.02;
         const thr = Math.max(0.012, floor * 3);
-        $('mic-lvl').style.setProperty('--w', Math.min(100, rms / 0.2 * 100) + '%');
+        lvls.forEach(l => l.style.setProperty('--w', Math.min(100, rms / 0.2 * 100) + '%'));
         if (!recording) {
           loudTicks = rms > thr ? loudTicks + 1 : 0;
-          if (loudTicks >= 2 && !micBusy && rec.state === 'inactive') { recording = true; quietMs = 0; recStart = Date.now(); rec.start(); $('mic-lvl').classList.add('rec'); }
+          if (loudTicks >= 2 && !micBusy && rec.state === 'inactive') { recording = true; quietMs = 0; recStart = Date.now(); rec.start(); lvls.forEach(l => l.classList.add('rec')); }
         } else {
           quietMs = rms > thr ? 0 : quietMs + MIC_TICK;
-          if (quietMs >= QUIET_END_MS || Date.now() - recStart > MAX_CLIP_MS) { recording = false; loudTicks = 0; rec.stop(); $('mic-lvl').classList.remove('rec'); }
+          if (quietMs >= QUIET_END_MS || Date.now() - recStart > MAX_CLIP_MS) { recording = false; loudTicks = 0; rec.stop(); lvls.forEach(l => l.classList.remove('rec')); }
         }
       }, MIC_TICK);
     }
@@ -507,7 +543,7 @@
       if (stream) return;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, facingMode: 'environment' }, audio: false });
-        video.srcObject = stream; $('cam-start').disabled = true; $('cam-stop').disabled = false;
+        video.srcObject = stream; $('video-map').srcObject = stream; $('cam-start').disabled = true; $('cam-stop').disabled = false;
         if (!sid) await start();
         awake = false; over = under = 0; setState('waiting for the board'); cueTick(); micStart();
       } catch (e) { $('cam-start').hidden = false; note('red', 'Camera: ' + e.message + (location.protocol === 'http:' && location.hostname !== 'localhost' ? ' — browsers only allow the camera on https or localhost' : '')); }
@@ -517,6 +553,11 @@
     $('cam-start').hidden = true;
     document.querySelector('nav button[data-tab=board]').addEventListener('click', camStart);
     if (location.hash === '#board') { document.querySelector('nav button[data-tab=board]').click(); }
+    const replaying = !!new URLSearchParams(location.search).get('replay');
+    document.querySelector('nav button[data-tab=map]').addEventListener('click', () => { setTimeout(ctxMap.resize, 0); if (!replaying) camStart(); });
+    if (location.hash === '#map') { document.querySelector('nav button[data-tab=map]').click(); }
+    $('handoff-map').addEventListener('click', handoff);
+    $('compact-map').addEventListener('click', compactNow);
     $('cam-stop').addEventListener('click', () => { clearTimeout(timer); clearTimeout(cueTimer); awake = false; setState('board says'); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; video.srcObject = null; $('cam-start').hidden = false; $('cam-start').disabled = false; $('cam-stop').disabled = true; cam.classList.remove('new', 'awake'); });
     $('reset-board').addEventListener('click', () => start().catch(e => note('red', String(e.message))));
     $('handoff-board').addEventListener('click', handoff);
