@@ -157,7 +157,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
             r = ears.transcribe(req.audio, req.mime)
         except Exception as e:
             raise HTTPException(502, f"speech server error: {type(e).__name__}: {e}")
-        heard = r.text
+        heard = re.sub(r"\[[A-Z_ ]+\]|\([a-z ]+\)", " ", r.text).strip()   # whisper markers: [BLANK_AUDIO], (laughs)
+        heard = re.sub(r"\s+", " ", heard)
         log.info("hear: %r (%.1fs)", heard[:120], r.seconds)
         now = time.time()
         out = {"heard": heard, "seconds": round(r.seconds, 2), "woke": False, "question": None,

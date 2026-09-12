@@ -112,7 +112,7 @@ def test_hear_wake_window_and_questions(cfg, monkeypatch):
         def __init__(self, texts): self.texts = list(texts)
         def health(self): return True
         def transcribe(self, audio, mime="audio/webm"): return HearResult(self.texts.pop(0), 0.3)
-    ears = FakeEars(["what time is it", "High Compaq demo", "how tall is everest", "hi compact demo what is the weather", "um"])
+    ears = FakeEars(["what time is it", "High Compaq demo", "how tall is everest", "hi compact demo what is the weather", "[BLANK_AUDIO]"])
     app = create_app(vllm=FakeVLLM(), cfg=cfg, vision=FakeVLLM(), tools=object(), ears=ears)
     c = TestClient(app)
     sid = c.post("/api/session", json={"mode": "endless", "board": True}).json()["session_id"]
@@ -121,7 +121,7 @@ def test_hear_wake_window_and_questions(cfg, monkeypatch):
     r = hear(); assert r["woke"] and r["listening"] and r["question"] is None             # wake phrase alone
     r = hear(); assert not r["woke"] and r["question"] == "how tall is everest"           # inside the window
     r = hear(); assert r["woke"] and r["question"] == "what is the weather"               # wake + question in one breath
-    r = hear(); assert r["question"] is None and r["listening"]                            # too short to be a question
+    r = hear(); assert r["question"] is None and r["listening"] and r["heard"] == ""      # silence marker ignored
 
 
 def test_hear_without_ears_is_503(cfg):
