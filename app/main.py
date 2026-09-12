@@ -9,11 +9,13 @@ from .jobs import RaceJob
 from .vllm import VLLM
 from .tools import Tools
 from . import grader
-import difflib, re
+import difflib, re, os, base64, logging
+log = logging.getLogger("uvicorn.error")
 from dataclasses import replace
 
-READ_PROMPT = ("A person is holding a small whiteboard up to the camera. Transcribe exactly what is written on it, "
-               "as one line of plain text. If there is no readable writing, reply with the single word NONE.")
+READ_PROMPT = ("A person is holding a whiteboard up to the camera. Write out what they wrote as one line of plain text. "
+               "Fix smudged or unclear letters to the obvious intended word; normal capitalization. "
+               "Output only that line. If there is no whiteboard or no writing, output NONE.")
 COMMANDS = {"COMPACT", "HANDOFF", "RESET", "NONE"}
 
 
@@ -144,6 +146,9 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None) -> FastAPI:
         except Exception as e:
             raise HTTPException(502, f"vision server error: {type(e).__name__}: {e}")
         text = r.text.strip().strip('"').splitlines()[0].strip() if r.text.strip() else "NONE"
+        log.info("look: %r (%d tokens, %.1fs)", r.text[:120], r.prompt_tokens, r.seconds)
+        if os.environ.get("CTXDEMO_SAVE_FRAME"):
+            Path(os.environ["CTXDEMO_SAVE_FRAME"]).write_bytes(base64.b64decode(req.image))
         out = {"read": text, "read_tokens": r.prompt_tokens, "seconds": round(r.seconds, 2),
                "question": None, "command": None, "new": False}
         word = norm(text).upper().replace(" ", "")
