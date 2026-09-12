@@ -121,6 +121,19 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None) -> FastAPI:
         sessions[h.new_session.id] = h.new_session
         return {"session_id": h.new_session.id, "note": h.note, "note_tokens": h.note_tokens, "state": h.new_session.state()}
 
+    @app.post("/api/compact")
+    def compact_now(req: SessReq = Body(...)):
+        """Compact on request (the whiteboard says COMPACT). Works in any mode."""
+        s = get(req.session_id)
+        if not s.transcript:
+            raise HTTPException(409, "nothing to compact yet")
+        try:
+            text = s._compact()
+        except Exception as e:
+            raise HTTPException(502, f"model server error: {type(e).__name__}: {e}")
+        s.events.append({"n": s.n, "event": "compacted", "text": text})
+        return {"summary": text, "state": s.state()}
+
     @app.post("/api/look")
     def look(req: LookReq = Body(...)):
         """Read the whiteboard. Returns the question if it's new, a command, or nothing. Never runs the turn."""

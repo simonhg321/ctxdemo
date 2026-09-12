@@ -98,6 +98,21 @@
   .progress { height: 4px; background: var(--line); margin: 14px 0; border-radius: 2px; overflow: hidden; }
   .progress b { display: block; height: 100%; background: var(--bone); width: 0; transition: width .4s; }
 
+  /* whiteboard */
+  .cam { position: relative; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #000; aspect-ratio: 16/9; max-height: 34vh; }
+  .cam video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cam .read { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 14px; background: rgba(15,18,22,.78); color: var(--dim); font-size: 14px; display: flex; gap: 14px; align-items: baseline; }
+  .cam .read b { color: var(--bone); font-weight: 500; font-size: 18px; }
+  .cam .read .cost { margin-left: auto; white-space: nowrap; }
+  .cam.new { outline: 2px solid var(--ice); outline-offset: -2px; }
+  .cam.thinking .read b::after { content: " …"; color: var(--amber); }
+  .event.tool { border-left-color: var(--moss); }
+  .event.tool .x { max-height: 120px; }
+  .controls select { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
+  .controls label { color: var(--dim); font-size: 14px; display: flex; gap: 6px; align-items: center; }
+  .cmds { color: var(--dim); font-size: 13px; margin-top: 6px; }
+  .cmds b { color: var(--bone); font-weight: 500; border: 1px solid var(--line); border-radius: 3px; padding: 0 6px; }
+
   .vocab { display: flex; gap: 26px; flex-wrap: wrap; color: var(--dim); font-size: 14px; padding: 16px 32px 0; }
   .vocab span b { color: var(--bone); font-weight: 500; }
   @media (prefers-reduced-motion: reduce) { .pack .bar .seg, .progress b { transition: none; } }
@@ -122,6 +137,7 @@
   <button role="tab" aria-selected="true" data-tab="pack">1 · The backpack</button>
   <button role="tab" aria-selected="false" data-tab="compact">2 · Compaction</button>
   <button role="tab" aria-selected="false" data-tab="race">3 · Handoff, side by side</button>
+  <button role="tab" aria-selected="false" data-tab="board">4 · The whiteboard</button>
 </nav>
 
 <div class="banner" id="banner">The model server isn't answering. On the box: <code>cd /srv/projects/vllm && docker compose logs -f</code></div>
@@ -169,6 +185,28 @@
   <div class="verdict" id="verdict"></div>
 </section>
 
+<!-- ===== tab 4 ===== -->
+<section class="tab" id="tab-board">
+  <p class="intro">Write a question on the whiteboard and hold it up to the camera. The assistant reads it, answers on the wall, and can <b>search the web</b>. Every question goes into the same backpack, and the search results do too, so watch it fill. Reading the board costs tokens as well, shown under the camera; that cost is not carried forward.</p>
+  <div class="duo">
+    <div>
+      <div class="cam" id="cam"><video id="video" autoplay playsinline muted></video>
+        <div class="read"><span>board says</span><b id="read-txt">–</b><span class="cost" id="read-cost"></span></div></div>
+      <div class="controls">
+        <button class="primary" id="cam-start">Start camera</button>
+        <button id="cam-stop" disabled>Stop</button>
+        <select id="board-mode"><option value="endless">never compact (fills up)</option><option value="compact">compact when nearly full</option></select>
+        <label><input type="checkbox" id="board-tools" checked> web search</label>
+        <button id="handoff-board">Hand off</button>
+        <button id="reset-board">Start over</button>
+      </div>
+      <div class="cmds">Board commands: <b>COMPACT</b> <b>HANDOFF</b> <b>RESET</b> — or type a question: <input type="text" id="free-board" placeholder="…if the marker ran dry" style="width:auto;min-width:220px;padding:4px 8px"></div>
+      <div class="chat" id="chat-board" style="margin-top:12px"></div>
+    </div>
+    <aside class="pack" id="pack-board"></aside>
+  </div>
+</section>
+
 <script>
 (() => {
   const $ = id => document.getElementById(id);
@@ -193,7 +231,7 @@
     try {
       cfg = await api('health');
       const ok = cfg.vllm === 'ok';
-      $('live').classList.toggle('down', !ok); $('livetxt').textContent = ok ? `model: ${cfg.model} · window ${fmt(cfg.window_tokens)} tokens` : 'model server down';
+      $('live').classList.toggle('down', !ok); $('livetxt').textContent = ok ? `model: ${cfg.model} · window ${fmt(cfg.window_tokens)} tokens${cfg.exact_counts === false ? ' · counts before sending are estimates' : ''}` : 'model server down';
       $('banner').classList.toggle('on', !ok);
       $('win1').textContent = fmt(cfg.window_tokens); $('hturn').textContent = $('hturn2').textContent = cfg.handoff_turn;
       document.querySelectorAll('.primary').forEach(b => b.disabled = !ok);
@@ -233,6 +271,11 @@
       chat.insertAdjacentHTML('beforeend', `<div class="event red"><div class="t">Backpack full — this message can't be sent</div><div class="x">${esc(t.event_text)}\nIn a real assistant this is where you'd hit "conversation too long", or it would compact on its own.</div></div>`);
       chat.scrollTop = chat.scrollHeight;
       return;
+    }
+    for (const u of (t.tool_uses || [])) {
+      let a = {}; try { a = JSON.parse(u.args || '{}'); } catch (e) {}
+      const what = u.name === 'web_search' ? `searched the web for “${esc(a.query || '')}”` : `read ${esc(a.url || '')}`;
+      chat.insertAdjacentHTML('beforeend', `<div class="event tool"><div class="t">${what} — the results went into the backpack</div><div class="x">${esc((u.result || '').slice(0, 600))}</div></div>`);
     }
     let badges = '';
     for (const [id, ok] of Object.entries(t.remembered || {})) badges += `<span class="badge ${ok ? 'ok' : 'miss'}">${ok ? '✓' : '✗'} ${id}</span>`;
@@ -316,7 +359,80 @@
     } catch (e) { $('race-status').textContent = 'error: ' + e.message; $('play').disabled = false; }
   });
 
-  health().then(() => { chatTab('pack', 'endless'); chatTab('compact', 'compact'); });
+  // ---- the whiteboard (tab 4): camera → /api/look → /api/turn
+  function boardTab() {
+    const chat = $('chat-board'), pack = $('pack-board'), cam = $('cam'), video = $('video');
+    pack.innerHTML = packHTML();
+    let sid = null, busy = false, stream = null, timer = null, readTotal = 0;
+    const note = (cls, t, x) => { chat.insertAdjacentHTML('beforeend', `<div class="event ${cls}"><div class="t">${esc(t)}</div>${x ? `<div class="x">${esc(x)}</div>` : ''}</div>`); chat.scrollTop = chat.scrollHeight; };
+    async function start() {
+      chat.innerHTML = ''; readTotal = 0; $('read-txt').textContent = '–'; $('read-cost').textContent = '';
+      const r = await api('session', { mode: $('board-mode').value, tools: $('board-tools').checked, board: true });
+      sid = r.session_id; packUpdate(pack, null, r.state);
+    }
+    async function turn(text) {
+      if (busy) return; busy = true; cam.classList.add('thinking');
+      try {
+        if (!sid) await start();
+        const r = await api('turn', { session_id: sid, text });
+        renderTurn(chat, r.turn); packUpdate(pack, r.turn, r.state);
+      } catch (e) { note('red', String(e.message)); }
+      finally { busy = false; cam.classList.remove('thinking'); }
+    }
+    async function handoff() {
+      if (busy || !sid) return; busy = true;
+      try {
+        const r = await api('handoff', { session_id: sid }); sid = r.session_id;
+        note('', `Session ended — handoff note (${fmt(r.note_tokens)} tokens). A fresh session starts with only this.`, r.note);
+        packUpdate(pack, null, r.state);
+      } catch (e) { note('red', String(e.message)); } finally { busy = false; }
+    }
+    async function compactNow() {
+      if (busy || !sid) return; busy = true;
+      try { const r = await api('compact', { session_id: sid }); note('', 'Compacted — the assistant kept this and threw the rest away', r.summary); packUpdate(pack, null, r.state); }
+      catch (e) { note('red', String(e.message)); } finally { busy = false; }
+    }
+    function snapshot() {
+      const w = Math.min(1024, video.videoWidth || 1024), h = Math.round(w * (video.videoHeight || 576) / (video.videoWidth || 1024));
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(video, 0, 0, w, h);
+      return c.toDataURL('image/jpeg', 0.7).split(',')[1];
+    }
+    async function look() {
+      if (!stream) return;
+      if (busy || !video.videoWidth) { timer = setTimeout(look, 1000); return; }
+      try {
+        if (!sid) await start();
+        const r = await api('look', { session_id: sid, image: snapshot() });
+        readTotal += r.read_tokens;
+        $('read-txt').textContent = r.read === 'NONE' ? '(nothing readable)' : r.read;
+        $('read-cost').textContent = `reading the board: ${fmt(r.read_tokens)} tokens · ${r.seconds} s · ${fmt(readTotal)} so far`;
+        cam.classList.toggle('new', !!r.new);
+        if (r.new && r.question) { note('', `Read off the board: “${r.question}”`); await turn(r.question); }
+        else if (r.command === 'COMPACT') await compactNow();
+        else if (r.command === 'HANDOFF') await handoff();
+        else if (r.command === 'RESET') await start();
+      } catch (e) { $('read-txt').textContent = 'read failed: ' + e.message; }
+      timer = setTimeout(look, 4000);
+    }
+    $('cam-start').addEventListener('click', async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, facingMode: 'environment' }, audio: false });
+        video.srcObject = stream; $('cam-start').disabled = true; $('cam-stop').disabled = false;
+        if (!sid) await start();
+        look();
+      } catch (e) { note('red', 'Camera: ' + e.message + (location.protocol === 'http:' && location.hostname !== 'localhost' ? ' — browsers only allow the camera on https or localhost' : '')); }
+    });
+    $('cam-stop').addEventListener('click', () => { clearTimeout(timer); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; video.srcObject = null; $('cam-start').disabled = false; $('cam-stop').disabled = true; cam.classList.remove('new'); });
+    $('reset-board').addEventListener('click', () => start().catch(e => note('red', String(e.message))));
+    $('handoff-board').addEventListener('click', handoff);
+    $('board-mode').addEventListener('change', () => start().catch(() => {}));
+    $('board-tools').addEventListener('change', () => start().catch(() => {}));
+    const free = $('free-board');
+    free.addEventListener('keydown', e => { if (e.key === 'Enter' && free.value.trim()) { const v = free.value.trim(); free.value = ''; turn(v); } });
+  }
+
+  health().then(() => { chatTab('pack', 'endless'); chatTab('compact', 'compact'); boardTab(); });
   setInterval(health, 15000);
 })();
 </script>

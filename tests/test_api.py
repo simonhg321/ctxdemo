@@ -85,3 +85,18 @@ def test_session_flags_pick_persona_and_tools(cfg):
     assert s.system == SYSTEM_BOARD and s.tools is not None
     sid2 = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
     assert app.state.sessions[sid2].tools is None
+
+
+def test_compact_now(cfg):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    from tests.conftest import FakeVLLM
+    fake = FakeVLLM(responses=["ok", "SUMMARY: user said hi"])
+    app = create_app(vllm=fake, cfg=cfg, vision=fake, tools=object())
+    c = TestClient(app)
+    sid = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
+    assert c.post("/api/compact", json={"session_id": sid}).status_code == 409
+    c.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    r = c.post("/api/compact", json={"session_id": sid}).json()
+    assert r["summary"] == "SUMMARY: user said hi" and r["state"]["memory"]["text"] == "SUMMARY: user said hi"
+    assert app.state.sessions[sid].transcript == []
