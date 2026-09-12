@@ -17,3 +17,13 @@ In `/srv/data/caddy/Caddyfile`, inside the `iiat.gonzaga.edu` block:
 	redir /demo /demo/ 301
 ```
 and add `/demo /demo/*` to the `not path` line in `(common)`. Then `docker exec caddy caddy reload --config /etc/caddy/Caddyfile`.
+
+## Act 4: the whiteboard + voice (added 2026-09-12)
+- Camera reads a whiteboard (reader model `VISION_MODEL` via `VISION_URL`, default = chat model); wakes on a strip of
+  green tape (browser-side, free), sleeps when the board leaves. Board commands COMPACT / HANDOFF / RESET.
+- Microphone: browser voice detection → one clip per utterance → local whisper.cpp (`EARS_URL`). Wake phrase
+  "hi compact demo" opens a 25 s question window (`listen_seconds`). Audio never leaves the box.
+- Web search tool (DuckDuckGo HTML, no key) — results go into the backpack. Board tab window = `board_window` (4096).
+- Dev loop on Typhoon: `run-typhoon.sh` (Ollama qwen3-vl:8b chat + qwen2.5vl:7b reader, whisper-server :8300),
+  reach via `ssh -L 8200:localhost:8200 typhoon` → http://localhost:8200/#board (camera/mic need localhost or https).
+- Box: `port-to-box.sh` once on the box, then `./deploy.sh` from the Mac. Compose runs a `whisper` sidecar.

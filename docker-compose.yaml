@@ -1,4 +1,6 @@
 # ctxdemo — "The Backpack" context-window demo. http://127.0.0.1:8200 (Caddy: /demo/)
+# Chat: vLLM qwen3-8b on the host (:8100). Whiteboard reader: Ollama qwen2.5vl:7b on the host (:11434, must
+# listen on the docker bridge — see port-to-box.sh). Ears: whisper.cpp in the container below, CPU, small.en.
 services:
   ctxdemo:
     build: .
@@ -10,5 +12,20 @@ services:
     extra_hosts: ["host.docker.internal:host-gateway"]
     environment:
       - VLLM_URL=http://host.docker.internal:8100
+      - VISION_URL=http://host.docker.internal:11434
+      - VISION_MODEL=qwen2.5vl:7b
+      - EARS_URL=http://whisper:8300
     volumes:
       - ./data:/srv/data
+    depends_on: [whisper]
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+  whisper:
+    image: ghcr.io/ggml-org/whisper.cpp:main
+    container_name: whisper
+    restart: unless-stopped
+    entrypoint: ["/app/build/bin/whisper-server"]
+    command: ["-m", "/models/ggml-small.en.bin", "--host", "0.0.0.0", "--port", "8300", "-t", "8", "--convert", "--tmp-dir", "/tmp"]
+    volumes:
+      - ./models:/models:ro
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
