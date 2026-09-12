@@ -152,3 +152,36 @@ def test_graph_fields_on_routes(fake, cfg):
 def test_static_is_served(client):
     assert client.get("/static/replay.json").status_code in (200, 404)      # the mount exists (404 until the file lands)
     assert client.get("/static/../app/main.py").status_code in (403, 404)
+
+
+def test_hear_returns_command_inside_window(fake, cfg):
+    from app.ears import HearResult
+    heard = iter(["hi compact demo", "compact", "hand off", "start over"])
+    class FakeEars:
+        def health(self): return True
+        def transcribe(self, audio, mime): return HearResult(next(heard), 0.1)
+    c = TestClient(create_app(vllm=fake, cfg=cfg, ears=FakeEars()))
+    sid = c.post("/api/session", json={"mode": "compact", "board": True}).json()["session_id"]
+    assert c.post("/api/hear", json={"session_id": sid, "audio": "AA==", "mime": "audio/webm"}).json()["woke"] is True
+    for cmd in ("COMPACT", "HANDOFF", "RESET"):
+        r = c.post("/api/hear", json={"session_id": sid, "audio": "AA==", "mime": "audio/webm"}).json()
+        assert r["command"] == cmd and r["question"] is None
+
+
+def test_hear_ignores_command_when_window_closed(fake, cfg):
+    from app.ears import HearResult
+    class FakeEars:
+        def health(self): return True
+        def transcribe(self, audio, mime): return HearResult("compact", 0.1)
+    c = TestClient(create_app(vllm=fake, cfg=cfg, ears=FakeEars()))
+    sid = c.post("/api/session", json={"mode": "compact", "board": True}).json()["session_id"]
+    r = c.post("/api/hear", json={"session_id": sid, "audio": "AA==", "mime": "audio/webm"}).json()
+    assert r["command"] is None and r["listening"] is False
+
+
+def test_teach_session_uses_the_map_prompt(fake, cfg):
+    from app.session import SYSTEM_MAP
+    c = TestClient(create_app(vllm=fake, cfg=cfg))
+    sid = c.post("/api/session", json={"mode": "compact", "board": True, "teach": True}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    assert fake.calls[-1]["messages"][0]["content"] == SYSTEM_MAP

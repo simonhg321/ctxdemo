@@ -21,3 +21,12 @@ def test_transcribe_posts_multipart():
     r = e.transcribe(base64.b64encode(b"OPUSDATA").decode(), "audio/webm;codecs=opus")
     assert r.text == "hello there" and seen["path"] == "/inference"
     assert seen["ct"].startswith("multipart/form-data") and b"OPUSDATA" in seen["body"] and b'filename="clip.webm"' in seen["body"]
+
+
+def test_spoken_commands():
+    from app.ears import spoken_command
+    assert spoken_command("Compact.") == "COMPACT"
+    assert spoken_command("hand off") == "HANDOFF" and spoken_command("Handoff!") == "HANDOFF"
+    assert spoken_command("start over") == "RESET" and spoken_command("reset") == "RESET"
+    assert spoken_command("compact the conversation please") is None      # a sentence is a question, not a command
+    assert spoken_command("") is None

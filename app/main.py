@@ -5,11 +5,11 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from . import config, script as script_mod
-from .session import Session, SYSTEM, SYSTEM_BOARD
+from .session import Session, SYSTEM, SYSTEM_BOARD, SYSTEM_MAP
 from .jobs import RaceJob
 from .vllm import VLLM
 from .tools import Tools
-from .ears import Ears, split_wake
+from .ears import Ears, split_wake, spoken_command
 from . import grader
 import difflib, re, os, base64, logging, time
 log = logging.getLogger("uvicorn.error")
@@ -36,6 +36,7 @@ class NewSession(BaseModel):
     mode: str = "endless"
     tools: bool = False          # let the assistant search the web
     board: bool = False          # whiteboard persona (short answers for a wall)
+    teach: bool = False          # the map: longer lab-guide answers that invite the next question
 
 
 class HearReq(BaseModel):
@@ -102,7 +103,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
         if req.mode not in ("endless", "compact", "handoff"):
             raise HTTPException(400, "mode must be endless|compact|handoff")
         s = Session(req.mode, vllm, replace(cfg, window_tokens=cfg.board_window) if req.board else cfg,
-                    system_prompt=SYSTEM_BOARD if req.board else SYSTEM, tools=tools if req.tools else None)
+                    system_prompt=SYSTEM_MAP if req.teach else SYSTEM_BOARD if req.board else SYSTEM,
+                    tools=tools if req.tools else None)
         sessions[s.id] = s
         return {"session_id": s.id, "state": s.state()}
 
@@ -165,8 +167,13 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
         heard = re.sub(r"\s+", " ", heard)
         log.info("hear: %r (%.1fs)", heard[:120], r.seconds)
         now = time.time()
-        out = {"heard": heard, "seconds": round(r.seconds, 2), "woke": False, "question": None,
+        out = {"heard": heard, "seconds": round(r.seconds, 2), "woke": False, "question": None, "command": None,
                "listening": now < s.listening_until, "listen_left": max(0, round(s.listening_until - now))}
+        if out["listening"] and (cmd := spoken_command(heard)):     # "compact" / "hand off" / "start over", said inside the window
+            out["command"] = cmd
+            s.listening_until = now + cfg.listen_seconds
+            out["listen_left"] = cfg.listen_seconds
+            return out
         woke, rest = split_wake(heard)
         if woke:
             s.listening_until = now + cfg.listen_seconds

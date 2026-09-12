@@ -21,6 +21,10 @@ SYSTEM = ("You are a helpful assistant helping plan a university lab open house.
 SYSTEM_BOARD = ("You are a friendly assistant in a university lab. People write questions on a whiteboard and hold it up "
                 "to a camera; you answer for a wall display. Keep answers short (2-4 sentences), plain, and concrete. "
                 "Use web_search for anything current (weather, news, scores) and say where the answer came from.")
+SYSTEM_MAP = ("You are a friendly guide in a university lab. People talk to you out loud and a wall display draws a map of "
+              "what you are holding in memory. Explain things in 4-6 plain, concrete sentences, like a good lab tour. "
+              "Use web_search for anything current (weather, news, scores) and say where the answer came from. "
+              "End every answer by naming one related thing they could ask about next, in one short sentence.")
 SUMMARY_PROMPT = ("Summarize the conversation below so that an assistant can continue it. "
                   "List EVERY concrete fact exactly as stated (dates, names, numbers, codes, places, rules) — do not paraphrase or drop any. "
                   "Plain text, no preamble.\n\nCONVERSATION:\n")

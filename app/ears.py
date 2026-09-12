@@ -32,6 +32,16 @@ def split_wake(heard: str, phrase: str = WAKE_PHRASE) -> tuple[bool, str]:
     return False, ""
 
 
+COMMANDS = {"compact": "COMPACT", "compact it": "COMPACT",
+            "handoff": "HANDOFF", "hand off": "HANDOFF", "hand it off": "HANDOFF",
+            "reset": "RESET", "start over": "RESET", "start again": "RESET"}
+
+
+def spoken_command(heard: str) -> str | None:
+    """A bare command word/phrase (inside the listening window) -> COMPACT / HANDOFF / RESET; anything longer is a question."""
+    return COMMANDS.get(norm(heard))
+
+
 class Ears:
     def __init__(self, url: str, transport: httpx.BaseTransport | None = None):
         self.url = url.rstrip("/")
