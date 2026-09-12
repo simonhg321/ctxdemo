@@ -1,0 +1,647 @@
+{
+ "turns": [
+  {
+   "user": "What is a token?",
+   "answer": "A token is a chunk of text the model reads, roughly three quarters of a word. Everything you say and everything it answers is counted in tokens.",
+   "sent_tokens": 120,
+   "new_tokens": 40,
+   "graph_delta": {
+    "added": [
+     "token",
+     "text",
+     "model"
+    ],
+    "bumped": [],
+    "edges": [
+     [
+      "model",
+      "text",
+      1
+     ],
+     [
+      "model",
+      "token",
+      1
+     ],
+     [
+      "text",
+      "token",
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "user": "And the context window?",
+   "answer": "The context window is the fixed number of tokens the model can hold at once. Once it is full, something has to be thrown away.",
+   "sent_tokens": 190,
+   "new_tokens": 38,
+   "graph_delta": {
+    "added": [
+     "context window"
+    ],
+    "bumped": [
+     "token",
+     "model"
+    ],
+    "edges": [
+     [
+      "context window",
+      "model",
+      1
+     ],
+     [
+      "context window",
+      "token",
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "user": "Explain quantization to me.",
+   "answer": "Quantization stores the model's weights in fewer bits, like int8 instead of 16-bit floats. It shrinks VRAM use and speeds things up at a small cost in accuracy.",
+   "sent_tokens": 260,
+   "new_tokens": 45,
+   "graph_delta": {
+    "added": [
+     "quantization",
+     "int8",
+     "vram",
+     "weight"
+    ],
+    "bumped": [
+     "model"
+    ],
+    "edges": [
+     [
+      "int8",
+      "quantization",
+      1
+     ],
+     [
+      "quantization",
+      "vram",
+      1
+     ],
+     [
+      "quantization",
+      "weight",
+      1
+     ],
+     [
+      "int8",
+      "vram",
+      1
+     ],
+     [
+      "model",
+      "quantization",
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "user": "Why does VRAM matter?",
+   "answer": "VRAM is the GPU's own memory. The whole model plus the context window has to fit in it, so less VRAM means a smaller model or a shorter window.",
+   "sent_tokens": 330,
+   "new_tokens": 42,
+   "graph_delta": {
+    "added": [
+     "gpu"
+    ],
+    "bumped": [
+     "vram",
+     "context window",
+     "model"
+    ],
+    "edges": [
+     [
+      "gpu",
+      "vram",
+      2
+     ],
+     [
+      "context window",
+      "vram",
+      1
+     ],
+     [
+      "gpu",
+      "model",
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "user": "What is RLHF?",
+   "answer": "RLHF is reinforcement learning from human feedback. People rank answers, a reward model learns those preferences, and the model is tuned to score well on it.",
+   "sent_tokens": 400,
+   "new_tokens": 44,
+   "graph_delta": {
+    "added": [
+     "rlhf",
+     "reward model",
+     "human feedback"
+    ],
+    "bumped": [
+     "model"
+    ],
+    "edges": [
+     [
+      "reward model",
+      "rlhf",
+      1
+     ],
+     [
+      "human feedback",
+      "rlhf",
+      1
+     ],
+     [
+      "human feedback",
+      "reward model",
+      1
+     ],
+     [
+      "model",
+      "rlhf",
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "user": "Is that why models refuse things?",
+   "answer": "Partly. The reward model learned that refusing certain requests scores well, so the tuned model refuses them too. It is a learned habit, not a rule in the code.",
+   "sent_tokens": 470,
+   "new_tokens": 41,
+   "graph_delta": {
+    "added": [
+     "refusal"
+    ],
+    "bumped": [
+     "reward model",
+     "model"
+    ],
+    "edges": [
+     [
+      "refusal",
+      "reward model",
+      1
+     ],
+     [
+      "model",
+      "refusal",
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "user": "What is a mixture of experts?",
+   "answer": "A mixture of experts splits the model into several smaller expert networks and a router picks one or two per token. You get a big model's knowledge at a small model's cost per token.",
+   "sent_tokens": 540,
+   "new_tokens": 46,
+   "graph_delta": {
+    "added": [
+     "mixture of expert",
+     "router",
+     "expert"
+    ],
+    "bumped": [
+     "token",
+     "model"
+    ],
+    "edges": [
+     [
+      "expert",
+      "mixture of expert",
+      1
+     ],
+     [
+      "mixture of expert",
+      "router",
+      1
+     ],
+     [
+      "expert",
+      "router",
+      1
+     ],
+     [
+      "mixture of expert",
+      "token",
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "user": "Does that make it faster?",
+   "answer": "Yes, latency per token drops because only part of the model runs. It still needs the whole model in VRAM though, so it does not save memory.",
+   "sent_tokens": 610,
+   "new_tokens": 40,
+   "event": "compacted",
+   "event_text": "The user asked about tokens, the context window, quantization (int8 weights, VRAM, GPU), RLHF with a reward model, and mixture of experts with a router. Latest question: whether MoE is faster.",
+   "graph_delta": {
+    "added": [
+     "latency"
+    ],
+    "bumped": [
+     "vram",
+     "model",
+     "mixture of expert"
+    ],
+    "edges": [
+     [
+      "latency",
+      "mixture of expert",
+      1
+     ],
+     [
+      "latency",
+      "vram",
+      1
+     ]
+    ],
+    "survive": {
+     "kept": [
+      [
+       "token",
+       1
+      ],
+      [
+       "context window",
+       1
+      ],
+      [
+       "quantization",
+       1
+      ],
+      [
+       "int8",
+       1
+      ],
+      [
+       "vram",
+       0
+      ],
+      [
+       "weight",
+       1
+      ],
+      [
+       "gpu",
+       1
+      ],
+      [
+       "rlhf",
+       1
+      ],
+      [
+       "reward model",
+       1
+      ],
+      [
+       "mixture of expert",
+       0
+      ],
+      [
+       "router",
+       1
+      ]
+     ],
+     "absorbed": [
+      [
+       "text",
+       "token"
+      ],
+      [
+       "model",
+       "context window"
+      ],
+      [
+       "human feedback",
+       "rlhf"
+      ],
+      [
+       "refusal",
+       "reward model"
+      ],
+      [
+       "expert",
+       "mixture of expert"
+      ]
+     ]
+    }
+   }
+  },
+  {
+   "user": "So what does compaction cost?",
+   "answer": "One extra model call to write the summary, and whatever detail the summary left out. The backpack got lighter but some things are gone for good.",
+   "sent_tokens": 260,
+   "new_tokens": 38,
+   "graph_delta": {
+    "added": [
+     "compaction",
+     "summary"
+    ],
+    "bumped": [
+     "context window"
+    ],
+    "edges": [
+     [
+      "compaction",
+      "summary",
+      1
+     ],
+     [
+      "compaction",
+      "context window",
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "user": "Which of the earlier things did you keep?",
+   "answer": "The summary kept tokens, the context window, quantization with int8 and VRAM, RLHF and the reward model, and mixture of experts. It dropped the aside about refusals.",
+   "sent_tokens": 330,
+   "new_tokens": 44,
+   "graph_delta": {
+    "added": [],
+    "bumped": [
+     "token",
+     "context window",
+     "quantization",
+     "int8",
+     "vram",
+     "rlhf",
+     "reward model",
+     "mixture of expert",
+     "summary"
+    ],
+    "edges": [
+     [
+      "summary",
+      "token",
+      1
+     ],
+     [
+      "quantization",
+      "summary",
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "user": "What is a handoff then?",
+   "answer": "A handoff ends this session on purpose and writes a short note listing the facts that matter. A fresh session starts with only that note, so it is deliberate, not a copy of a copy.",
+   "sent_tokens": 400,
+   "new_tokens": 45,
+   "graph_delta": {
+    "added": [
+     "handoff",
+     "note"
+    ],
+    "bumped": [
+     "summary",
+     "compaction"
+    ],
+    "edges": [
+     [
+      "handoff",
+      "note",
+      1
+     ],
+     [
+      "compaction",
+      "handoff",
+      1
+     ],
+     [
+      "note",
+      "summary",
+      1
+     ]
+    ]
+   }
+  },
+  {
+   "handoff": true,
+   "note": "Facts: a token is about three quarters of a word. The context window is a fixed token budget. Quantization stores weights in int8 to save VRAM. RLHF tunes the model against a reward model. Mixture of experts routes each token to a few experts. Compaction summarizes; a handoff writes a note and starts fresh. Goal: teach how context fills and what survives. Next: keep asking.",
+   "graph_survive": {
+    "kept": [
+     [
+      "token",
+      2
+     ],
+     [
+      "context window",
+      2
+     ],
+     [
+      "quantization",
+      2
+     ],
+     [
+      "int8",
+      2
+     ],
+     [
+      "vram",
+      1
+     ],
+     [
+      "weight",
+      2
+     ],
+     [
+      "rlhf",
+      2
+     ],
+     [
+      "reward model",
+      1
+     ],
+     [
+      "mixture of expert",
+      1
+     ],
+     [
+      "compaction",
+      1
+     ],
+     [
+      "handoff",
+      1
+     ],
+     [
+      "note",
+      1
+     ]
+    ],
+    "absorbed": [
+     [
+      "gpu",
+      "vram"
+     ],
+     [
+      "router",
+      "mixture of expert"
+     ],
+     [
+      "latency",
+      "vram"
+     ],
+     [
+      "summary",
+      "compaction"
+     ]
+    ]
+   },
+   "graph_seed": {
+    "nodes": [
+     {
+      "label": "token",
+      "first_n": 1,
+      "mentions": 4,
+      "generation": 2
+     },
+     {
+      "label": "context window",
+      "first_n": 2,
+      "mentions": 4,
+      "generation": 2
+     },
+     {
+      "label": "quantization",
+      "first_n": 3,
+      "mentions": 2,
+      "generation": 2
+     },
+     {
+      "label": "int8",
+      "first_n": 3,
+      "mentions": 2,
+      "generation": 2
+     },
+     {
+      "label": "vram",
+      "first_n": 3,
+      "mentions": 4,
+      "generation": 1
+     },
+     {
+      "label": "weight",
+      "first_n": 3,
+      "mentions": 1,
+      "generation": 2
+     },
+     {
+      "label": "rlhf",
+      "first_n": 5,
+      "mentions": 2,
+      "generation": 2
+     },
+     {
+      "label": "reward model",
+      "first_n": 5,
+      "mentions": 3,
+      "generation": 1
+     },
+     {
+      "label": "mixture of expert",
+      "first_n": 7,
+      "mentions": 4,
+      "generation": 1
+     },
+     {
+      "label": "compaction",
+      "first_n": 9,
+      "mentions": 2,
+      "generation": 1
+     },
+     {
+      "label": "handoff",
+      "first_n": 11,
+      "mentions": 1,
+      "generation": 1
+     },
+     {
+      "label": "note",
+      "first_n": 11,
+      "mentions": 1,
+      "generation": 1
+     }
+    ],
+    "edges": [
+     [
+      "context window",
+      "token",
+      1
+     ],
+     [
+      "int8",
+      "quantization",
+      1
+     ],
+     [
+      "quantization",
+      "vram",
+      1
+     ],
+     [
+      "quantization",
+      "weight",
+      1
+     ],
+     [
+      "int8",
+      "vram",
+      1
+     ],
+     [
+      "context window",
+      "vram",
+      1
+     ],
+     [
+      "reward model",
+      "rlhf",
+      1
+     ],
+     [
+      "mixture of expert",
+      "token",
+      1
+     ],
+     [
+      "compaction",
+      "context window",
+      1
+     ],
+     [
+      "quantization",
+      "token",
+      1
+     ],
+     [
+      "handoff",
+      "note",
+      1
+     ],
+     [
+      "compaction",
+      "handoff",
+      1
+     ]
+    ]
+   }
+  }
+ ]
+}
