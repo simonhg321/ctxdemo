@@ -23,6 +23,8 @@ class Config:
     vision_model: str = ""               # defaults to model (fine when the chat model can see, e.g. qwen3-vl)
     ears_url: str = ""                   # whisper.cpp server; empty = no microphone
     listen_seconds: int = 25             # after the wake phrase, how long the mic stays open for questions
+    extract: bool = True                 # the map: one extra model call per turn to pull concepts
+    extract_max_tokens: int = 200
     prices: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
@@ -31,6 +33,8 @@ def load(root: Path = ROOT) -> Config:
     prices = {k: v for k, v in json.loads((root / "config" / "prices.json").read_text()).items() if not k.startswith("_")}
     if os.environ.get("VLLM_MODEL"):
         demo["model"] = os.environ["VLLM_MODEL"]
+    if os.environ.get("CTXDEMO_EXTRACT") == "0":
+        demo["extract"] = False
     url = os.environ.get("VLLM_URL", "http://127.0.0.1:8100")
     return Config(vllm_url=url, vision_url=os.environ.get("VISION_URL", url),
                   vision_model=os.environ.get("VISION_MODEL", demo["model"]), ears_url=os.environ.get("EARS_URL", ""),

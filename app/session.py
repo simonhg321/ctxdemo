@@ -2,12 +2,15 @@
 
 Every turn reports what the user typed vs what the model actually received (real vLLM token counts)."""
 from __future__ import annotations
-import uuid
+import copy, logging, uuid
 from dataclasses import dataclass, field, asdict
 from typing import Literal
 from .config import Config
 from .vllm import text_of
 from .tools import TOOLS
+from .graph import Graph, EXTRACT_PROMPT, parse_extract
+
+log = logging.getLogger("uvicorn.error")
 
 MAX_TOOL_ROUNDS = 3
 
@@ -42,6 +45,7 @@ class TurnResult:
     total_sent: int
     total_new: int
     tool_uses: list[dict] = field(default_factory=list)   # {name, args, result} per tool call this turn
+    graph_delta: dict = field(default_factory=lambda: {"added": [], "bumped": [], "edges": []})   # the map
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -52,6 +56,7 @@ class HandoffResult:
     note: str
     note_tokens: int
     new_session: "Session"
+    graph_survive: dict = field(default_factory=dict)     # what the map kept / absorbed on the way over
 
 
 class Session:
@@ -74,6 +79,8 @@ class Session:
         self.events: list[dict] = []              # {"n", "event", "text"} for the UI
         self.last_board: str = ""                 # last question read off the whiteboard (dedupe)
         self.listening_until: float = 0.0         # mic: open window after the wake phrase (epoch seconds)
+        self.graph = Graph()                      # the map: concepts this session is holding
+        self.last_survive: dict | None = None     # set by _compact, picked up by turn() / the compact route
 
     # ---- what would be sent next
     @property
@@ -115,10 +122,25 @@ class Session:
         r = self.vllm.chat([{"role": "user", "content": SUMMARY_PROMPT + self._transcript_text()}],
                            self.cfg.summary_max_tokens)
         self.memory = ("Summary of our conversation so far", r.text)
+        self.last_survive = self.graph.survive(r.text)
         self.transcript = []
         return r.text
 
     # ---- one turn
+    def _extract(self, n: int, user_text: str, answer: str) -> tuple[dict, int, int, float]:
+        """One small model call -> (delta, prompt_tokens, completion_tokens, seconds). Never raises."""
+        empty = {"added": [], "bumped": [], "edges": []}
+        if not self.cfg.extract or not answer:
+            return empty, 0, 0, 0.0
+        try:
+            r = self.vllm.chat([{"role": "user", "content": f"{EXTRACT_PROMPT}USER: {user_text}\n\nASSISTANT: {answer}"}],
+                               self.cfg.extract_max_tokens)
+            concepts, links = parse_extract(r.text)
+            return self.graph.apply(n, concepts, links), r.prompt_tokens, r.completion_tokens, r.seconds
+        except Exception as e:      # the map must never break a turn
+            log.warning("extract failed: %s: %s", type(e).__name__, e)
+            return empty, 0, 0, 0.0
+
     def turn(self, user_text: str) -> TurnResult:
         n = self.n + 1
         typed = len(user_text.split())
@@ -161,10 +183,16 @@ class Session:
             r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools)
         sent += r.prompt_tokens; new += r.completion_tokens; secs += r.seconds
         self.transcript.append({"role": "assistant", "content": r.text})
+        delta, xp, xc, xs = self._extract(n, user_text, r.text)
+        sent += xp; new += xc; secs += xs
+        breakdown["extract"] = xp
+        if event == "compacted" and self.last_survive is not None:
+            delta["survive"] = self.last_survive; self.last_survive = None
         tr = TurnResult(n=n, user=user_text, answer=r.text, sent_tokens=sent, new_tokens=new,
                         typed_words=typed, seconds=round(secs, 2), breakdown=breakdown,
                         event=event, event_text=event_text, cost_usd=self._cost(sent, new),
-                        total_sent=self.total_sent + sent, total_new=self.total_new + new, tool_uses=uses)
+                        total_sent=self.total_sent + sent, total_new=self.total_new + new, tool_uses=uses,
+                        graph_delta=delta)
         self.turns.append(tr)
         if event:
             self.events.append({"n": n, "event": event, "text": event_text})
@@ -195,11 +223,13 @@ class Session:
         new.script_pos = self.script_pos
         new.carried_typed = self.total_typed
         new.events.append({"n": self.n, "event": "handoff", "text": r.text})
-        return HandoffResult(note=r.text, note_tokens=self.vllm.count(r.text), new_session=new)
+        g = copy.deepcopy(self.graph); surv = g.survive(r.text); new.graph = g      # only what the note says carries over
+        return HandoffResult(note=r.text, note_tokens=self.vllm.count(r.text), new_session=new, graph_survive=surv)
 
     def state(self) -> dict:
         return {"id": self.id, "mode": self.mode, "n": self.n, "turns": [t.to_dict() for t in self.turns],
                 "events": self.events, "memory": {"label": self.memory[0], "text": self.memory[1]} if self.memory else None,
                 "totals": {"sent": self.total_sent, "new": self.total_new, "typed": self.total_typed,
                            "cost_usd": self._cost(self.total_sent, self.total_new)},
-                "window_tokens": self.cfg.window_tokens, "next_would_send": self.vllm.count_messages(self.messages)}
+                "window_tokens": self.cfg.window_tokens, "next_would_send": self.vllm.count_messages(self.messages),
+                "graph": self.graph.to_dict()}

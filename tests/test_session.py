@@ -98,3 +98,56 @@ def test_no_tools_means_no_tools_param(cfg):
     fake = FakeVLLM()
     Session("endless", fake, cfg).turn("hi")
     assert fake.calls[0]["tools"] is None
+
+
+# ---- the map: extraction per turn, survive on compaction / handoff
+from dataclasses import replace as _replace
+
+
+def test_extract_runs_once_per_turn_and_charges_tokens(fake, cfg):
+    c = _replace(cfg, extract=True)
+    ex = '{"concepts": ["quantization", "int8"], "links": []}'
+    fake.responses = ["The answer about quantization.", ex]
+    s = Session("endless", fake, c)
+    t = s.turn("tell me about quantization")
+    assert len(fake.calls) == 2 and fake.calls[1]["max_tokens"] == c.extract_max_tokens
+    assert t.graph_delta["added"] == ["quantization", "int8"]
+    assert t.breakdown["extract"] > 0 and sum(t.breakdown.values()) + 4 * 2 == t.sent_tokens   # main call: 2 framed messages in the fake
+    assert t.new_tokens == fake.count("The answer about quantization.") + fake.count(ex)
+    assert s.state()["graph"]["nodes"][0]["label"] == "quantization"
+
+
+def test_extract_off_means_no_extra_call(fake, cfg):
+    s = Session("endless", fake, cfg)
+    t = s.turn("hello")
+    assert len(fake.calls) == 1 and t.graph_delta == {"added": [], "bumped": [], "edges": []}
+
+
+def test_extract_failure_is_swallowed(fake, cfg):
+    c = _replace(cfg, extract=True)
+    fake.responses = ["ok", "not json at all"]
+    t = Session("endless", fake, c).turn("hi")
+    assert t.graph_delta["added"] == []
+
+
+def test_compaction_survives_graph(fake, cfg):
+    c = _replace(cfg, extract=True, window_tokens=80, compact_at=0.5)
+    fake.responses = ["a1", '{"concepts": ["alpha", "beta"], "links": []}',
+                      "summary mentions alpha only",                        # the compaction call
+                      "a2", '{"concepts": ["gamma"], "links": []}']
+    s = Session("compact", fake, c)
+    s.turn("one two three four five six seven eight nine ten eleven twelve")
+    t = s.turn("thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty")
+    assert t.event == "compacted"
+    assert t.graph_delta["survive"] == {"kept": [["alpha", 1]], "absorbed": [["beta", "alpha"]]}
+    assert set(n["label"] for n in s.state()["graph"]["nodes"]) == {"alpha", "gamma"}
+
+
+def test_handoff_seeds_graph_from_note(fake, cfg):
+    c = _replace(cfg, extract=True)
+    fake.responses = ["a1", '{"concepts": ["alpha", "beta"], "links": [["alpha","beta"]]}', "NOTE: alpha matters"]
+    s = Session("handoff", fake, c); s.turn("x")
+    h = s.handoff()
+    assert h.graph_survive == {"kept": [["alpha", 1]], "absorbed": [["beta", "alpha"]]}
+    assert [n["label"] for n in h.new_session.state()["graph"]["nodes"]] == ["alpha"]
+    assert set(s.graph.nodes) == {"alpha", "beta"}          # old session untouched
