@@ -55,6 +55,13 @@
   .cam.mini video { max-height: 130px; }
   .micline { color: var(--dim); font-size: 13px; display: flex; gap: 8px; align-items: center; }
   #tab-map { padding-bottom: 16px; }
+  .stage { position: relative; min-height: 0; }
+  .ask { position: absolute; left: 16px; right: 16px; bottom: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
+         color: var(--dim); font-size: 15px; transition: opacity 1.2s; pointer-events: none; }
+  .ask .wake { color: var(--bone); margin-right: 6px; }
+  .ask b { font-weight: 500; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; }
+  .ask .cmd { width: 100%; text-align: center; font-size: 13px; margin-top: 2px; } .ask .cmd b { font-size: 12px; padding: 2px 8px; }
+  .ask.quiet { opacity: .25; }
   @media (max-width: 900px) { .mapwrap { grid-template-columns: 1fr; height: auto; } #map { height: 60vh; } }
   .chat { display: grid; gap: 10px; align-content: start; max-height: 62vh; overflow-y: auto; padding-right: 8px; border: 1px solid var(--line); border-radius: 6px; padding: 12px; min-height: 240px; }
   .msg { display: grid; gap: 4px; max-width: 70ch; }
@@ -119,7 +126,7 @@
   .cam .read b { color: var(--bone); font-weight: 500; font-size: 18px; }
   .cam .read .cost { margin-left: auto; white-space: nowrap; }
   .cam.new { outline: 2px solid var(--ice); outline-offset: -2px; }
-  .cam.awake .read { background: rgba(15,18,22,.9); } .cam.awake .read #cue-state { color: var(--moss); }
+  .cam.awake .read { background: rgba(15,18,22,.9); } .cam.awake .read #cue-state, .cam.awake .read #cue-state-map { color: var(--moss); }
   .cam.thinking .read b::after { content: " …"; color: var(--amber); }
   .event.tool { border-left-color: var(--moss); }
   .event.tool .x { max-height: 120px; }
@@ -231,9 +238,12 @@
 <!-- ===== tab 5: the same session as tab 4, drawn as a map ===== -->
 <section class="tab" id="tab-map">
   <div class="mapwrap">
-    <canvas id="map"></canvas>
+    <div class="stage"><canvas id="map"></canvas>
+      <div class="ask" id="ask-strip"><span class="wake">say “hi compact demo”, then ask about…</span>
+        <b>VRAM</b><b>quantization</b><b>tokens</b><b>the context window</b><b>RLHF</b><b>compaction</b><b>handoff</b>
+        <span class="cmd">…or say <b>compact</b> · <b>hand off</b> · <b>start over</b></span></div></div>
     <aside class="mapside">
-      <div class="cam mini"><video id="video-map" autoplay playsinline muted></video>
+      <div class="cam mini" id="cam-map"><video id="video-map" autoplay playsinline muted></video>
         <div class="read"><span id="cue-state-map">board says</span><b id="read-txt-map">–</b></div></div>
       <div class="micline"><i class="lvl" id="mic-lvl-map"></i> <span id="mic-state-map"></span></div>
       <div class="chat" id="chat-map"></div>
@@ -399,7 +409,10 @@
 
   // ---- the whiteboard (tab 4): camera → /api/look → /api/turn
   function boardTab() {
-    const cam = $('cam'), video = $('video');
+    const camEl = $('cam'), video = $('video');
+    const cam = { classList: { add: (...c) => [camEl, $('cam-map')].forEach(e => e.classList.add(...c)),
+                               remove: (...c) => [camEl, $('cam-map')].forEach(e => e.classList.remove(...c)),
+                               toggle: (c, f) => [camEl, $('cam-map')].forEach(e => e.classList.toggle(c, f)) } };
     // tab 4 and tab 5 show the same session: every render goes to both columns, the map listens on top.
     const chats = [$('chat-board'), $('chat-map')], packs = [$('pack-board'), $('pack-map')];
     packs.forEach(p => p.innerHTML = packHTML());
@@ -440,8 +453,9 @@
     const note = (cls, t, x) => { chat.insertAdjacentHTML('beforeend', `<div class="event ${cls}"><div class="t">${esc(t)}</div>${x ? `<div class="x">${esc(x)}</div>` : ''}</div>`); chat.scrollTop = chat.scrollHeight; };
     async function start() {
       chat.innerHTML = ''; readTotal = 0; readTxt('–'); $('read-cost').textContent = '';
-      const r = await api('session', { mode: $('board-mode').value, tools: $('board-tools').checked, board: true });
-      sid = r.session_id; packAll(null, r.state); ctxMap.seed(r.state.graph);
+      const teach = document.querySelector('nav button[data-tab=map]').getAttribute('aria-selected') === 'true';
+      const r = await api('session', { mode: $('board-mode').value, tools: $('board-tools').checked, board: true, teach });
+      sid = r.session_id; packAll(null, r.state); ctxMap.seed(r.state.graph); $('ask-strip').classList.remove('quiet');
     }
     async function turn(text) {
       if (busy) return; busy = true; cam.classList.add('thinking');
@@ -449,6 +463,7 @@
         if (!sid) await start();
         const r = await api('turn', { session_id: sid, text });
         renderTurn(chat, r.turn); packAll(r.turn, r.state); ctxMap.applyDelta(r.turn.graph_delta);
+        $('ask-strip').classList.toggle('quiet', (r.state.graph.nodes || []).length >= 6);
       } catch (e) { note('red', String(e.message)); }
       finally { busy = false; cam.classList.remove('thinking'); }
     }
@@ -536,7 +551,12 @@
           r = await api('hear', { session_id: sid, audio: b64, mime: blob.type || 'audio/webm' });
         }
         if (r.woke) { cam.classList.add('awake'); }
-        if (r.question) { micState(`heard: “${r.heard}”`); note('', `Heard: “${r.heard}”`); await turn(r.question); micState(`listening… ${r.listen_left} s`); }
+        if (r.command) {
+          micState(`heard “${r.heard}” — ${r.command.toLowerCase()}`); note('', `You said: “${r.heard}”`);
+          if (r.command === 'COMPACT') await compactNow(); else if (r.command === 'HANDOFF') await handoff(); else await start();
+          micState(`listening… ${r.listen_left} s`);
+        }
+        else if (r.question) { micState(`heard: “${r.heard}”`); note('', `Heard: “${r.heard}”`); await turn(r.question); micState(`listening… ${r.listen_left} s`); }
         else if (r.listening) micState(r.woke ? 'listening… ask your question' : `listening… ${r.listen_left} s · heard “${r.heard}”`);
         else micState(r.heard ? `(ignored: “${r.heard.slice(0, 40)}”) — say “hi compact demo”` : 'say “hi compact demo”');
       } catch (e) { micState('speech: ' + e.message); }
