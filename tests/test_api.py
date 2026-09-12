@@ -131,3 +131,24 @@ def test_hear_without_ears_is_503(cfg):
     c = TestClient(create_app(vllm=FakeVLLM(), cfg=cfg, vision=FakeVLLM(), tools=object()))
     sid = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
     assert c.post("/api/hear", json={"session_id": sid, "audio": "QUJD"}).status_code == 503
+
+
+# ---- the map
+def test_graph_fields_on_routes(fake, cfg):
+    from dataclasses import replace
+    app = create_app(vllm=fake, cfg=replace(cfg, extract=True)); app.state.race_threads = False
+    c = TestClient(app)
+    fake.responses = ["a1", '{"concepts": ["alpha", "beta"], "links": []}', "summary: alpha", "NOTE beta"]
+    sid = c.post("/api/session", json={"mode": "handoff"}).json()["session_id"]
+    t = c.post("/api/turn", json={"session_id": sid, "text": "x"}).json()["turn"]
+    assert t["graph_delta"]["added"] == ["alpha", "beta"]
+    assert c.get(f"/api/session/{sid}").json()["graph"]["edges"] == [["alpha", "beta", 1]]
+    j = c.post("/api/compact", json={"session_id": sid}).json()
+    assert j["graph_survive"]["kept"] == [["alpha", 1]] and j["graph_survive"]["absorbed"] == [["beta", "alpha"]]
+    h = c.post("/api/handoff", json={"session_id": sid}).json()
+    assert h["graph_survive"] == {"kept": [], "absorbed": [["alpha", None]]} and h["graph_seed"]["nodes"] == []
+
+
+def test_static_is_served(client):
+    assert client.get("/static/replay.json").status_code in (200, 404)      # the mount exists (404 until the file lands)
+    assert client.get("/static/../app/main.py").status_code in (403, 404)

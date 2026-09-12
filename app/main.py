@@ -2,6 +2,7 @@
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from . import config, script as script_mod
 from .session import Session, SYSTEM, SYSTEM_BOARD
@@ -68,6 +69,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
     tools = tools or Tools()
     scr = script_mod.load()
     app = FastAPI(title="ctxdemo")
+    app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
     sessions: dict[str, Session] = {}
     jobs: dict[str, RaceJob] = {}
     app.state.sessions, app.state.jobs = sessions, jobs
@@ -132,7 +134,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
         except Exception as e:
             raise HTTPException(502, f"model server error: {type(e).__name__}: {e}")
         sessions[h.new_session.id] = h.new_session
-        return {"session_id": h.new_session.id, "note": h.note, "note_tokens": h.note_tokens, "state": h.new_session.state()}
+        return {"session_id": h.new_session.id, "note": h.note, "note_tokens": h.note_tokens, "state": h.new_session.state(),
+                "graph_seed": h.new_session.graph.to_dict(), "graph_survive": h.graph_survive}
 
     @app.post("/api/compact")
     def compact_now(req: SessReq = Body(...)):
@@ -145,7 +148,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
         except Exception as e:
             raise HTTPException(502, f"model server error: {type(e).__name__}: {e}")
         s.events.append({"n": s.n, "event": "compacted", "text": text})
-        return {"summary": text, "state": s.state()}
+        surv, s.last_survive = s.last_survive or {"kept": [], "absorbed": []}, None
+        return {"summary": text, "graph_survive": surv, "state": s.state()}
 
     @app.post("/api/hear")
     def hear(req: HearReq = Body(...)):
