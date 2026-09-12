@@ -4,7 +4,7 @@
   const NOW = () => performance.now();
   let canvas, ctx, sim, nodes = [], links = [], byId = new Map(), W = 0, H = 0, collapse = null;
   const css = k => getComputedStyle(document.documentElement).getPropertyValue(k).trim();
-  const R = m => 6 + 3 * Math.sqrt(m);
+  const R = m => 9 + 5 * Math.sqrt(m);
   function resize() {
     if (!canvas) return;
     const b = canvas.getBoundingClientRect(); if (!b.width) return;
@@ -16,16 +16,16 @@
   function init(el) {
     canvas = el; ctx = el.getContext('2d'); resize(); addEventListener('resize', resize);
     sim = d3.forceSimulation(nodes)
-      .force('link', d3.forceLink(links).id(d => d.id).distance(l => 90 - 8 * Math.min(5, l.w)).strength(l => 0.15 + 0.1 * Math.min(5, l.w)))
-      .force('charge', d3.forceManyBody().strength(-220))
+      .force('link', d3.forceLink(links).id(d => d.id).distance(l => 150 - 12 * Math.min(5, l.w)).strength(l => 0.12 + 0.08 * Math.min(5, l.w)))
+      .force('charge', d3.forceManyBody().strength(-700).distanceMax(600))
       .force('center', d3.forceCenter(W / 2, H / 2))
-      .force('collide', d3.forceCollide(d => R(d.m) + 16))
+      .force('collide', d3.forceCollide(d => R(d.m) + 34))
       .alphaDecay(0.025).velocityDecay(0.35);
     requestAnimationFrame(loop);
   }
   const add = (id, m, gen, x, y) => {
     if (byId.has(id)) return byId.get(id);
-    const n = { id, m: m || 1, gen: gen || 0, born: NOW(), x: x ?? W / 2 + (Math.random() - .5) * 80, y: y ?? H / 2 + (Math.random() - .5) * 80 };
+    const n = { id, m: m || 1, gen: gen || 0, born: NOW(), x: x ?? W / 2 + (Math.random() - .5) * 200, y: y ?? H / 2 + (Math.random() - .5) * 200 };
     nodes.push(n); byId.set(id, n); return n;
   };
   const link = (a, b, w) => {
@@ -70,13 +70,14 @@
     const bone = css('--bone'), moss = css('--moss'), dim = css('--dim'), ice = css('--ice'), amber = css('--amber');
     ctx.lineCap = 'round';
     for (const l of links) {
-      ctx.strokeStyle = dim; ctx.globalAlpha = 0.4; ctx.lineWidth = 0.6 + 0.7 * Math.min(6, l.w);
+      ctx.strokeStyle = dim; ctx.globalAlpha = 0.4; ctx.lineWidth = 1 + 1.2 * Math.min(6, l.w);
       ctx.beginPath(); ctx.moveTo(l.source.x, l.source.y); ctx.lineTo(l.target.x, l.target.y); ctx.stroke();
     }
     ctx.globalAlpha = 1;
     for (let i = nodes.length - 1; i >= 0; i--) {
       const n = nodes[i];
       const r = R(n.m), age = t - n.born;
+      if (!n.fading) { n.x = Math.max(r + 24, Math.min(W - r - 24, n.x)); n.y = Math.max(r + 24, Math.min(H - r - 40, n.y)); }   // stay inside the frame
       if (n.fading) {                              // absorbed: drift into the survivor (or the centre) and fade over 1.2 s
         const k = Math.min(1, (t - n.fading) / 1200);
         const tx = n.target ? n.target.x : n.tx, ty = n.target ? n.target.y : n.ty;
@@ -97,8 +98,8 @@
       ctx.globalAlpha = alpha; ctx.fillStyle = n.gen ? ice : bone;
       ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, 7); ctx.fill();
       if (r > 7 || nodes.length < 45) {
-        ctx.fillStyle = bone; ctx.font = `${r > 12 ? 15 : 13}px "Helvetica Neue", system-ui, sans-serif`; ctx.textAlign = 'center';
-        ctx.fillText(n.gen > 1 ? `${n.id} ·${n.gen}` : n.id, n.x, n.y + r + 15);
+        ctx.fillStyle = bone; ctx.font = `${r > 16 ? 19 : 16}px "Helvetica Neue", system-ui, sans-serif`; ctx.textAlign = 'center';
+        ctx.fillText(n.gen > 1 ? `${n.id} ·${n.gen}` : n.id, n.x, n.y + r + 19);
       }
       ctx.globalAlpha = 1;
     }

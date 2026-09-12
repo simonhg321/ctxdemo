@@ -46,7 +46,12 @@
   .mapwrap { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; height: calc(100vh - 150px); min-height: 480px; }
   #map { width: 100%; height: 100%; display: block; background: var(--ground); border: 1px solid var(--line); border-radius: 6px; }
   .mapside { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto auto; gap: 10px; min-height: 0; }
-  .mapside .chat { max-height: none; min-height: 0; }
+  .mapside .chat { max-height: none; min-height: 220px; }
+  .mapside .pack { position: static; gap: 8px; grid-template-columns: 1fr 1fr; }
+  .mapside .pack .bar { height: 110px; grid-column: 1 / -1; }
+  .mapside .pack .big { font-size: 24px; }
+  .mapside .pack .legend, .mapside .pack .total { grid-column: 1 / -1; }
+  .mapside .pack .legend { display: none; }
   .cam.mini video { max-height: 130px; }
   .micline { color: var(--dim); font-size: 13px; display: flex; gap: 8px; align-items: center; }
   #tab-map { padding-bottom: 16px; }
