@@ -105,6 +105,7 @@
   .cam .read b { color: var(--bone); font-weight: 500; font-size: 18px; }
   .cam .read .cost { margin-left: auto; white-space: nowrap; }
   .cam.new { outline: 2px solid var(--ice); outline-offset: -2px; }
+  .cam.awake .read { background: rgba(15,18,22,.9); } .cam.awake .read #cue-state { color: var(--moss); }
   .cam.thinking .read b::after { content: " …"; color: var(--amber); }
   .event.tool { border-left-color: var(--moss); }
   .event.tool .x { max-height: 120px; }
@@ -191,16 +192,17 @@
   <div class="duo">
     <div>
       <div class="cam" id="cam"><video id="video" autoplay playsinline muted></video>
-        <div class="read"><span>board says</span><b id="read-txt">–</b><span class="cost" id="read-cost"></span></div></div>
+        <div class="read"><span id="cue-state">board says</span><b id="read-txt">–</b><span class="cost" id="read-cost"></span></div></div>
       <div class="controls">
         <button class="primary" id="cam-start">Start camera</button>
         <button id="cam-stop" disabled>Stop</button>
         <select id="board-mode"><option value="endless">never compact (fills up)</option><option value="compact">compact when nearly full</option></select>
         <label><input type="checkbox" id="board-tools" checked> web search</label>
+        <label><input type="checkbox" id="board-cue" checked> wake on green tape <span id="cue-pct" style="min-width:5ch"></span></label>
         <button id="handoff-board">Hand off</button>
         <button id="reset-board">Start over</button>
       </div>
-      <div class="cmds">Board commands: <b>COMPACT</b> <b>HANDOFF</b> <b>RESET</b> — or type a question: <input type="text" id="free-board" placeholder="…if the marker ran dry" style="width:auto;min-width:220px;padding:4px 8px"></div>
+      <div class="cmds">Hold the board with the green tape in view to wake the camera; lower it and it goes back to sleep. Board commands: <b>COMPACT</b> <b>HANDOFF</b> <b>RESET</b> — or type a question: <input type="text" id="free-board" placeholder="…if the marker ran dry" style="width:auto;min-width:220px;padding:4px 8px"></div>
       <div class="chat" id="chat-board" style="margin-top:12px"></div>
     </div>
     <aside class="pack" id="pack-board"></aside>
@@ -364,6 +366,33 @@
     const chat = $('chat-board'), pack = $('pack-board'), cam = $('cam'), video = $('video');
     pack.innerHTML = packHTML();
     let sid = null, busy = false, stream = null, timer = null, readTotal = 0;
+    // ---- the cue: a strip of green tape on the board. Checked in the browser every second, costs nothing.
+    const CUE_ON = 1.0, CUE_TICKS_WAKE = 2, CUE_TICKS_SLEEP = 4;     // % of thumbnail pixels that are tape-green
+    let awake = false, over = 0, under = 0, cueTimer = null;
+    const thumb = document.createElement('canvas'); thumb.width = 64; thumb.height = 36;
+    function greenPct() {
+      const ctx = thumb.getContext('2d', { willReadFrequently: true }); ctx.drawImage(video, 0, 0, 64, 36);
+      const d = ctx.getImageData(0, 0, 64, 36).data; let hit = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        if (g > 90 && g > r * 1.25 && g > b * 1.25 && g - Math.min(r, b) > 50) hit++;
+      }
+      return 100 * hit / (d.length / 4);
+    }
+    function setState(t) { $('cue-state').textContent = t; }
+    function cueTick() {
+      if (!stream) return;
+      if (!$('board-cue').checked) { if (!awake) wake(); cueTimer = setTimeout(cueTick, 1000); return; }
+      if (video.videoWidth) {
+        const p = greenPct(); $('cue-pct').textContent = p.toFixed(1) + '%';
+        if (p >= CUE_ON) { over++; under = 0; } else { under++; over = 0; }
+        if (!awake && over >= CUE_TICKS_WAKE) wake();
+        else if (awake && under >= CUE_TICKS_SLEEP) sleep();
+      }
+      cueTimer = setTimeout(cueTick, 1000);
+    }
+    function wake() { awake = true; cam.classList.add('awake'); setState('board says'); clearTimeout(timer); look(); }
+    function sleep() { awake = false; cam.classList.remove('awake', 'new'); clearTimeout(timer); timer = null; setState('waiting for the board'); $('read-txt').textContent = '–'; }
     const note = (cls, t, x) => { chat.insertAdjacentHTML('beforeend', `<div class="event ${cls}"><div class="t">${esc(t)}</div>${x ? `<div class="x">${esc(x)}</div>` : ''}</div>`); chat.scrollTop = chat.scrollHeight; };
     async function start() {
       chat.innerHTML = ''; readTotal = 0; $('read-txt').textContent = '–'; $('read-cost').textContent = '';
@@ -399,7 +428,7 @@
       return c.toDataURL('image/jpeg', 0.7).split(',')[1];
     }
     async function look() {
-      if (!stream) return;
+      if (!stream || !awake) return;
       if (busy || !video.videoWidth) { timer = setTimeout(look, 1000); return; }
       try {
         if (!sid) await start();
@@ -413,17 +442,23 @@
         else if (r.command === 'HANDOFF') await handoff();
         else if (r.command === 'RESET') await start();
       } catch (e) { $('read-txt').textContent = 'read failed: ' + e.message; }
-      timer = setTimeout(look, 4000);
+      if (awake) timer = setTimeout(look, 4000);
     }
-    $('cam-start').addEventListener('click', async () => {
+    async function camStart() {
+      if (stream) return;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, facingMode: 'environment' }, audio: false });
         video.srcObject = stream; $('cam-start').disabled = true; $('cam-stop').disabled = false;
         if (!sid) await start();
-        look();
-      } catch (e) { note('red', 'Camera: ' + e.message + (location.protocol === 'http:' && location.hostname !== 'localhost' ? ' — browsers only allow the camera on https or localhost' : '')); }
-    });
-    $('cam-stop').addEventListener('click', () => { clearTimeout(timer); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; video.srcObject = null; $('cam-start').disabled = false; $('cam-stop').disabled = true; cam.classList.remove('new'); });
+        awake = false; over = under = 0; setState('waiting for the board'); cueTick();
+      } catch (e) { $('cam-start').hidden = false; note('red', 'Camera: ' + e.message + (location.protocol === 'http:' && location.hostname !== 'localhost' ? ' — browsers only allow the camera on https or localhost' : '')); }
+    }
+    $('cam-start').addEventListener('click', camStart);
+    // the camera starts itself when this tab is shown (kiosk: permission already granted). The button only appears if that fails.
+    $('cam-start').hidden = true;
+    document.querySelector('nav button[data-tab=board]').addEventListener('click', camStart);
+    if (location.hash === '#board') { document.querySelector('nav button[data-tab=board]').click(); }
+    $('cam-stop').addEventListener('click', () => { clearTimeout(timer); clearTimeout(cueTimer); awake = false; setState('board says'); if (stream) stream.getTracks().forEach(t => t.stop()); stream = null; video.srcObject = null; $('cam-start').hidden = false; $('cam-start').disabled = false; $('cam-stop').disabled = true; cam.classList.remove('new', 'awake'); });
     $('reset-board').addEventListener('click', () => start().catch(e => note('red', String(e.message))));
     $('handoff-board').addEventListener('click', handoff);
     $('board-mode').addEventListener('change', () => start().catch(() => {}));
