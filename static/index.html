@@ -111,6 +111,9 @@
   .event.tool .x { max-height: 120px; }
   .controls select { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; }
   .controls label { color: var(--dim); font-size: 14px; display: flex; gap: 6px; align-items: center; }
+  .lvl { display: inline-block; width: 60px; height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; vertical-align: middle; position: relative; }
+  .lvl::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--w, 0%); background: var(--moss); }
+  .lvl.rec::after { background: var(--red); }
   .cmds { color: var(--dim); font-size: 13px; margin-top: 6px; }
   .cmds b { color: var(--bone); font-weight: 500; border: 1px solid var(--line); border-radius: 3px; padding: 0 6px; }
 
@@ -199,10 +202,11 @@
         <select id="board-mode"><option value="endless">never compact (fills up)</option><option value="compact">compact when nearly full</option></select>
         <label><input type="checkbox" id="board-tools" checked> web search</label>
         <label><input type="checkbox" id="board-cue" checked> wake on green tape <span id="cue-pct" style="min-width:5ch"></span></label>
+        <label><input type="checkbox" id="board-mic" checked> microphone <i class="lvl" id="mic-lvl"></i> <span id="mic-state"></span></label>
         <button id="handoff-board">Hand off</button>
         <button id="reset-board">Start over</button>
       </div>
-      <div class="cmds">Hold the board with the green tape in view to wake the camera; lower it and it goes back to sleep. Board commands: <b>COMPACT</b> <b>HANDOFF</b> <b>RESET</b> — or type a question: <input type="text" id="free-board" placeholder="…if the marker ran dry" style="width:auto;min-width:220px;padding:4px 8px"></div>
+      <div class="cmds">Hold the board with the green tape in view to wake the camera; lower it and it goes back to sleep. Or say <b>Hi Compact Demo</b> and ask out loud. Board commands: <b>COMPACT</b> <b>HANDOFF</b> <b>RESET</b> — or type a question: <input type="text" id="free-board" placeholder="…if the marker ran dry" style="width:auto;min-width:220px;padding:4px 8px"></div>
       <div class="chat" id="chat-board" style="margin-top:12px"></div>
     </div>
     <aside class="pack" id="pack-board"></aside>
@@ -444,13 +448,62 @@
       } catch (e) { $('read-txt').textContent = 'read failed: ' + e.message; }
       if (awake) timer = setTimeout(look, 4000);
     }
+    // ---- the microphone: browser watches loudness, records one utterance, sends it to local Whisper.
+    // Nothing is sent while the room is quiet. Only "hi compact demo" opens the question window.
+    let mic = null, rec = null, chunks = [], recording = false, quietMs = 0, loudTicks = 0, recStart = 0, floor = 0.01, micBusy = false;
+    const MIC_TICK = 100, QUIET_END_MS = 1200, MAX_CLIP_MS = 12000;
+    const micState = t => { $('mic-state').textContent = t; };
+    async function micStart() {
+      if (mic || !$('board-mic').checked || cfg.ears === 'none') { if (cfg.ears === 'none') micState('no speech server'); return; }
+      try {
+        mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+      } catch (e) { micState('mic blocked: ' + e.message); return; }
+      const ac = new (window.AudioContext || window.webkitAudioContext)();
+      const src = ac.createMediaStreamSource(mic), an = ac.createAnalyser(); an.fftSize = 1024; src.connect(an);
+      const buf = new Float32Array(an.fftSize);
+      const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find(m => MediaRecorder.isTypeSupported(m)) || '';
+      rec = new MediaRecorder(mic, mime ? { mimeType: mime } : {});
+      rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+      rec.onstop = () => { const b = new Blob(chunks, { type: rec.mimeType }); chunks = []; if (b.size > 2000) sendClip(b); };
+      micState('say “hi compact demo”');
+      setInterval(() => {
+        if (!mic) return;
+        an.getFloatTimeDomainData(buf); let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+        const rms = Math.sqrt(sum / buf.length);
+        if (!recording) floor = floor * 0.98 + rms * 0.02;
+        const thr = Math.max(0.012, floor * 3);
+        $('mic-lvl').style.setProperty('--w', Math.min(100, rms / 0.2 * 100) + '%');
+        if (!recording) {
+          loudTicks = rms > thr ? loudTicks + 1 : 0;
+          if (loudTicks >= 2 && !micBusy && rec.state === 'inactive') { recording = true; quietMs = 0; recStart = Date.now(); rec.start(); $('mic-lvl').classList.add('rec'); }
+        } else {
+          quietMs = rms > thr ? 0 : quietMs + MIC_TICK;
+          if (quietMs >= QUIET_END_MS || Date.now() - recStart > MAX_CLIP_MS) { recording = false; loudTicks = 0; rec.stop(); $('mic-lvl').classList.remove('rec'); }
+        }
+      }, MIC_TICK);
+    }
+    async function sendClip(blob) {
+      micBusy = true;
+      try {
+        if (!sid) await start();
+        const b64 = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result.split(',')[1]); fr.readAsDataURL(blob); });
+        const r = await api('hear', { session_id: sid, audio: b64, mime: blob.type || 'audio/webm' });
+        if (r.woke) { cam.classList.add('awake'); }
+        if (r.question) { micState(`heard: “${r.heard}”`); note('', `Heard: “${r.heard}”`); await turn(r.question); micState(`listening… ${r.listen_left} s`); }
+        else if (r.listening) micState(r.woke ? 'listening… ask your question' : `listening… ${r.listen_left} s · heard “${r.heard}”`);
+        else micState(r.heard ? `(ignored: “${r.heard.slice(0, 40)}”) — say “hi compact demo”` : 'say “hi compact demo”');
+      } catch (e) { micState('speech: ' + e.message); }
+      finally { micBusy = false; }
+    }
+    $('board-mic').addEventListener('change', () => { if ($('board-mic').checked) micStart(); else if (mic) { mic.getTracks().forEach(t => t.stop()); mic = null; micState('off'); } });
+
     async function camStart() {
       if (stream) return;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, facingMode: 'environment' }, audio: false });
         video.srcObject = stream; $('cam-start').disabled = true; $('cam-stop').disabled = false;
         if (!sid) await start();
-        awake = false; over = under = 0; setState('waiting for the board'); cueTick();
+        awake = false; over = under = 0; setState('waiting for the board'); cueTick(); micStart();
       } catch (e) { $('cam-start').hidden = false; note('red', 'Camera: ' + e.message + (location.protocol === 'http:' && location.hostname !== 'localhost' ? ' — browsers only allow the camera on https or localhost' : '')); }
     }
     $('cam-start').addEventListener('click', camStart);

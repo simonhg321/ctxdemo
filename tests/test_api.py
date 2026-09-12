@@ -101,3 +101,33 @@ def test_compact_now(cfg):
     r = c.post("/api/compact", json={"session_id": sid}).json()
     assert r["summary"] == "SUMMARY: user said hi" and r["state"]["memory"]["text"] == "SUMMARY: user said hi"
     assert app.state.sessions[sid].transcript == []
+
+
+def test_hear_wake_window_and_questions(cfg, monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    from tests.conftest import FakeVLLM
+    from app.ears import HearResult
+    class FakeEars:
+        def __init__(self, texts): self.texts = list(texts)
+        def health(self): return True
+        def transcribe(self, audio, mime="audio/webm"): return HearResult(self.texts.pop(0), 0.3)
+    ears = FakeEars(["what time is it", "High Compaq demo", "how tall is everest", "hi compact demo what is the weather", "um"])
+    app = create_app(vllm=FakeVLLM(), cfg=cfg, vision=FakeVLLM(), tools=object(), ears=ears)
+    c = TestClient(app)
+    sid = c.post("/api/session", json={"mode": "endless", "board": True}).json()["session_id"]
+    hear = lambda: c.post("/api/hear", json={"session_id": sid, "audio": "QUJD"}).json()
+    r = hear(); assert not r["woke"] and not r["listening"] and r["question"] is None      # not awake: ignored
+    r = hear(); assert r["woke"] and r["listening"] and r["question"] is None             # wake phrase alone
+    r = hear(); assert not r["woke"] and r["question"] == "how tall is everest"           # inside the window
+    r = hear(); assert r["woke"] and r["question"] == "what is the weather"               # wake + question in one breath
+    r = hear(); assert r["question"] is None and r["listening"]                            # too short to be a question
+
+
+def test_hear_without_ears_is_503(cfg):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    from tests.conftest import FakeVLLM
+    c = TestClient(create_app(vllm=FakeVLLM(), cfg=cfg, vision=FakeVLLM(), tools=object()))
+    sid = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
+    assert c.post("/api/hear", json={"session_id": sid, "audio": "QUJD"}).status_code == 503

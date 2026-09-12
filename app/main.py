@@ -8,8 +8,9 @@ from .session import Session, SYSTEM, SYSTEM_BOARD
 from .jobs import RaceJob
 from .vllm import VLLM
 from .tools import Tools
+from .ears import Ears, split_wake
 from . import grader
-import difflib, re, os, base64, logging
+import difflib, re, os, base64, logging, time
 log = logging.getLogger("uvicorn.error")
 from dataclasses import replace
 
@@ -36,6 +37,12 @@ class NewSession(BaseModel):
     board: bool = False          # whiteboard persona (short answers for a wall)
 
 
+class HearReq(BaseModel):
+    session_id: str
+    audio: str                   # base64 audio clip from MediaRecorder
+    mime: str = "audio/webm"
+
+
 class LookReq(BaseModel):
     session_id: str
     image: str                   # base64 jpeg, no data: prefix
@@ -50,8 +57,10 @@ class SessReq(BaseModel):
     session_id: str
 
 
-def create_app(vllm=None, cfg=None, vision=None, tools=None) -> FastAPI:
+def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastAPI:
     cfg = cfg or config.load()
+    if ears is None and cfg.ears_url:
+        ears = Ears(cfg.ears_url)
     vllm = vllm or VLLM(cfg.vllm_url, cfg.model)
     if vision is None:
         vision = vllm if (cfg.vision_url in ("", cfg.vllm_url) and cfg.vision_model in ("", cfg.model)) \
@@ -78,6 +87,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None) -> FastAPI:
         return {"vllm": "ok" if vllm.health() else "down", "model": cfg.model, "window_tokens": cfg.window_tokens,
                 "vision": "ok" if vision.health() else "down", "vision_model": getattr(vision, "model", cfg.model),
                 "exact_counts": getattr(vllm, "exact", True), "board_window": cfg.board_window,
+                "ears": ("ok" if ears.health() else "down") if ears else "none", "listen_seconds": cfg.listen_seconds,
                 "compact_at": cfg.compact_at, "handoff_turn": cfg.handoff_turn, "script_turns": len(scr.turns),
                 "prices": cfg.prices}
 
@@ -136,6 +146,34 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None) -> FastAPI:
             raise HTTPException(502, f"model server error: {type(e).__name__}: {e}")
         s.events.append({"n": s.n, "event": "compacted", "text": text})
         return {"summary": text, "state": s.state()}
+
+    @app.post("/api/hear")
+    def hear(req: HearReq = Body(...)):
+        """Transcribe a clip. Wake phrase opens a listening window; inside it, speech is a question. Never runs the turn."""
+        if not ears:
+            raise HTTPException(503, "no microphone backend (EARS_URL not set)")
+        s = get(req.session_id)
+        try:
+            r = ears.transcribe(req.audio, req.mime)
+        except Exception as e:
+            raise HTTPException(502, f"speech server error: {type(e).__name__}: {e}")
+        heard = r.text
+        log.info("hear: %r (%.1fs)", heard[:120], r.seconds)
+        now = time.time()
+        out = {"heard": heard, "seconds": round(r.seconds, 2), "woke": False, "question": None,
+               "listening": now < s.listening_until, "listen_left": max(0, round(s.listening_until - now))}
+        woke, rest = split_wake(heard)
+        if woke:
+            s.listening_until = now + cfg.listen_seconds
+            out.update(woke=True, listening=True, listen_left=cfg.listen_seconds)
+            if len(rest.split()) >= 2:
+                out["question"] = rest
+            return out
+        if out["listening"] and len(heard.split()) >= 2:
+            out["question"] = heard
+            s.listening_until = now + cfg.listen_seconds       # a question keeps the window open
+            out["listen_left"] = cfg.listen_seconds
+        return out
 
     @app.post("/api/look")
     def look(req: LookReq = Body(...)):

@@ -73,6 +73,7 @@ class Session:
         self.script_pos = 0
         self.events: list[dict] = []              # {"n", "event", "text"} for the UI
         self.last_board: str = ""                 # last question read off the whiteboard (dedupe)
+        self.listening_until: float = 0.0         # mic: open window after the wake phrase (epoch seconds)
 
     # ---- what would be sent next
     @property

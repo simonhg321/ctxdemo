@@ -21,6 +21,8 @@ class Config:
     vllm_url: str = "http://127.0.0.1:8100"
     vision_url: str = ""                 # server that reads the whiteboard; defaults to vllm_url
     vision_model: str = ""               # defaults to model (fine when the chat model can see, e.g. qwen3-vl)
+    ears_url: str = ""                   # whisper.cpp server; empty = no microphone
+    listen_seconds: int = 25             # after the wake phrase, how long the mic stays open for questions
     prices: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
@@ -31,4 +33,5 @@ def load(root: Path = ROOT) -> Config:
         demo["model"] = os.environ["VLLM_MODEL"]
     url = os.environ.get("VLLM_URL", "http://127.0.0.1:8100")
     return Config(vllm_url=url, vision_url=os.environ.get("VISION_URL", url),
-                  vision_model=os.environ.get("VISION_MODEL", demo["model"]), prices=prices, **demo)
+                  vision_model=os.environ.get("VISION_MODEL", demo["model"]), ears_url=os.environ.get("EARS_URL", ""),
+                  prices=prices, **demo)
