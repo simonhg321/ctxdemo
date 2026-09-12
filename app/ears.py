@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import httpx
 
 WAKE_PHRASE = "compact demo"
-WAKE_LEADS = ("hi", "hey", "hello", "ok", "okay", "high")      # whisper hears "High Compaq demo"
+WAKE_LEAD_WORDS = 4      # the phrase may sit this many words into the utterance (whisper hallucinates leads: "check hi compact demo")
 _NOISE = re.compile(r"[^a-z0-9' ]+")
 
 
@@ -24,13 +24,11 @@ def split_wake(heard: str, phrase: str = WAKE_PHRASE) -> tuple[bool, str]:
     """Returns (woke, remainder). Fuzzy: 'high compaq demo whats up' -> (True, 'whats up')."""
     words = norm(heard).split()
     n = len(phrase.split())
-    for start in range(0, min(len(words), 3)):                 # phrase may follow a lead word or two
+    for start in range(0, min(len(words), WAKE_LEAD_WORDS + 1)):   # phrase may follow a few lead words
         cand = " ".join(words[start:start + n])
-        if cand and difflib.SequenceMatcher(None, cand, phrase).ratio() >= 0.72:
-            lead_ok = all(w in WAKE_LEADS for w in words[:start])
-            if lead_ok:
-                rest = " ".join(words[start + n:]).strip()
-                return True, rest
+        if len(words[start:start + n]) == n and difflib.SequenceMatcher(None, cand, phrase).ratio() >= 0.72:
+            rest = " ".join(words[start + n:]).strip()
+            return True, rest
     return False, ""
 
 

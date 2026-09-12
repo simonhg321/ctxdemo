@@ -8,6 +8,8 @@ def test_split_wake_fuzzy_and_remainder():
     assert split_wake("Hey, Compact Demo. What's the weather?") == (True, "what's the weather")
     assert split_wake("what is the weather in spokane") == (False, "")
     assert split_wake("the demo is compact") == (False, "")
+    assert split_wake("check Hi-Compact demo") == (True, "")                 # whisper hallucinates a lead word
+    assert split_wake("um so hi compact demo what is 2 times 2") == (True, "what is 2 times 2")
 
 
 def test_transcribe_posts_multipart():
