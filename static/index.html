@@ -419,7 +419,16 @@
     const chat = { insertAdjacentHTML: (w, h) => chats.forEach(c => c.insertAdjacentHTML(w, h)),
                    set innerHTML(v) { chats.forEach(c => c.innerHTML = v); },
                    get scrollHeight() { return 0; }, set scrollTop(v) { chats.forEach(c => c.scrollTop = c.scrollHeight); } };
-    const packAll = (turn, state) => packs.forEach(p => packUpdate(p, turn, state));
+    const packAll = (turn, state) => { packs.forEach(p => packUpdate(p, turn, state)); tellWall(turn, state); };
+    // framed in the split wall: hand the session's numbers up, the wall's context dials run on them (same origin only)
+    function tellWall(turn, state) {
+      if (window.parent === window || !state) return;
+      try {
+        window.parent.postMessage({ ctxdemo: 1, id: state.id || null, n: state.n ?? (turn ? turn.n : 0), window_tokens: state.window_tokens,
+          next_would_send: state.next_would_send ?? null, totals: state.totals || null,
+          turn: turn ? { n: turn.n, typed_words: turn.typed_words, sent_tokens: turn.sent_tokens, new_tokens: turn.new_tokens, event: turn.event || null } : null }, location.origin);
+      } catch (e) {}
+    }
     const readTxt = v => { $('read-txt').textContent = v; $('read-txt-map').textContent = v; };
     ctxMap.init($('map'));
     let sid = null, busy = false, stream = null, timer = null, readTotal = 0;
