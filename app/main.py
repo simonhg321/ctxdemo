@@ -60,6 +60,11 @@ class SessReq(BaseModel):
     session_id: str
 
 
+class ListenReq(BaseModel):
+    session_id: str
+    off: bool = False            # the off button: close the window now
+
+
 def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastAPI:
     cfg = cfg or config.load()
     if ears is None and cfg.ears_url:
@@ -173,8 +178,9 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
                "listening": now < s.listening_until, "listen_left": max(0, round(s.listening_until - now))}
         if out["listening"] and (cmd := spoken_command(heard)):     # "compact" / "hand off" / "start over", said inside the window
             out["command"] = cmd
-            s.listening_until = now + cfg.listen_seconds
-            out["listen_left"] = cfg.listen_seconds
+            s.listening_until = 0 if cmd == "SLEEP" else now + cfg.listen_seconds
+            out["listen_left"] = 0 if cmd == "SLEEP" else cfg.listen_seconds
+            out["listening"] = cmd != "SLEEP"
             return out
         woke, rest = split_wake(heard)
         if woke:
@@ -190,13 +196,15 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
         return out
 
     @app.post("/api/listen")
-    def keep_listening(req: SessReq = Body(...)):
+    def keep_listening(req: ListenReq = Body(...)):
         """The answer has finished (been read aloud): restart the follow-up window, if one was open recently.
         Thinking + speaking used to eat the whole window, so a natural follow-up needed the wake phrase again."""
         s = get(req.session_id)
         now = time.time()
-        if s.listening_until > now - 120:
-            s.listening_until = now + cfg.listen_seconds
+        if req.off:
+            s.listening_until = 0
+        elif s.listening_until > now - 120:
+            s.listening_until = now + cfg.followup_seconds
         return {"listening": now < s.listening_until, "listen_left": max(0, round(s.listening_until - now))}
 
     @app.post("/api/look")

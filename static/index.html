@@ -247,7 +247,7 @@
     <div class="stage"><canvas id="map"></canvas>
       <div class="ask" id="ask-strip"><span class="wake">say “hi compact demo”, then ask about…</span>
         <b>VRAM</b><b>quantization</b><b>tokens</b><b>the context window</b><b>RLHF</b><b>compaction</b><b>handoff</b>
-        <span class="cmd">…or say <b>compact</b> · <b>hand off</b> · <b>start over</b></span></div></div>
+        <span class="cmd">…or say <b>compact</b> · <b>hand off</b> · <b>start over</b> · <b>stop</b></span></div></div>
     <aside class="mapside">
       <div class="cam mini" id="cam-map"><video id="video-map" autoplay playsinline muted></video>
         <div class="read"><span id="cue-state-map">board says</span><b id="read-txt-map">–</b></div></div>
@@ -493,9 +493,16 @@
     // The mic is deaf while it talks (and a beat after), or the demo would hear itself and answer its own answer.
     const VOICE = !!new URLSearchParams(location.search).get('voice') && 'speechSynthesis' in window;
     let speaking = false;
+    // the off button: say "stop" / "thank you" / "go to sleep", or press Esc. Shuts up mid-sentence and sleeps until the wake phrase.
+    function goQuiet(msg) {
+      if ('speechSynthesis' in window) speechSynthesis.cancel();
+      speaking = false; cam.classList.remove('awake'); micState(msg || 'asleep — say “hi compact demo”');
+    }
+    window.ctxGoQuiet = () => { goQuiet(); if (sid) api('listen', { session_id: sid, off: true }).catch(() => {}); };
+    window.addEventListener('keydown', e => { if (e.key === 'Escape') window.ctxGoQuiet(); });
     async function keepListening() {               // the answer is over: reopen the follow-up window so nobody has to say the wake phrase twice
       if (!sid || !mic) return;
-      try { const r = await api('listen', { session_id: sid }); if (r.listening) micState(`listening… ${r.listen_left} s — ask a follow-up`); } catch (e) {}
+      try { const r = await api('listen', { session_id: sid }); micState(r.listening ? `listening… ${r.listen_left} s — ask a follow-up, or say “stop”` : 'asleep — say “hi compact demo”'); } catch (e) {}
     }
     function speak(answer, after) {
       if (!VOICE || !answer) { if (after) after(); return; }
@@ -621,7 +628,8 @@
           r = await api('hear', { session_id: sid, audio: b64, mime: blob.type || 'audio/webm' });
         }
         if (r.woke) { cam.classList.add('awake'); }
-        if (r.command) {
+        if (r.command === 'SLEEP') { goQuiet(`heard “${r.heard}” — asleep. Say “hi compact demo” to wake me`); }
+        else if (r.command) {
           micState(`heard “${r.heard}” — ${r.command.toLowerCase()}`); note('', `You said: “${r.heard}”`);
           if (r.command === 'COMPACT') await compactNow(); else if (r.command === 'HANDOFF') await handoff(); else await start();
           micState(`listening… ${r.listen_left} s`);

@@ -23,6 +23,7 @@ class Config:
     vision_model: str = ""               # defaults to model (fine when the chat model can see, e.g. qwen3-vl)
     ears_url: str = ""                   # whisper.cpp server; empty = no microphone
     listen_seconds: int = 25             # after the wake phrase, how long the mic stays open for questions
+    followup_seconds: int = 12           # after an answer the mic stays open this long for a follow-up, then sleeps (25 s chained forever on room chatter)
     extract: bool = True                 # the map: one extra model call per turn to pull concepts
     extract_max_tokens: int = 200
     prices: dict[str, dict[str, float]] = field(default_factory=dict)

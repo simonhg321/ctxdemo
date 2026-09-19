@@ -198,7 +198,7 @@ def test_listen_restarts_a_recent_window_only(fake, cfg):
     assert c.post("/api/listen", json={"session_id": sid}).json()["listening"] is False      # never woken: stays shut
     c.post("/api/hear", json={"session_id": sid, "audio": "QUJD"})
     r = c.post("/api/listen", json={"session_id": sid}).json()
-    assert r["listening"] is True and r["listen_left"] == cfg.listen_seconds
+    assert r["listening"] is True and r["listen_left"] == cfg.followup_seconds
 
 
 def test_board_session_window_override_is_clamped(fake, cfg):
@@ -208,3 +208,19 @@ def test_board_session_window_override_is_clamped(fake, cfg):
     assert win({"mode": "endless", "board": True, "window": 50}) == 1024
     assert win({"mode": "endless", "board": True}) == cfg.board_window
     assert win({"mode": "endless", "window": 2048}) == cfg.window_tokens                      # only the board tab
+
+
+def test_spoken_stop_closes_the_window_and_followup_is_short(fake, cfg):
+    from app.ears import HearResult
+    heard = iter(["hi compact demo", "Thank you.", "what is a token anyway"])
+    class FakeEars:
+        def health(self): return True
+        def transcribe(self, audio, mime): return HearResult(next(heard), 0.1)
+    c = TestClient(create_app(vllm=fake, cfg=cfg, ears=FakeEars()))
+    sid = c.post("/api/session", json={"mode": "endless", "board": True}).json()["session_id"]
+    hear = lambda: c.post("/api/hear", json={"session_id": sid, "audio": "QUJD"}).json()
+    assert hear()["woke"]
+    assert c.post("/api/listen", json={"session_id": sid}).json()["listen_left"] == cfg.followup_seconds
+    r = hear(); assert r["command"] == "SLEEP" and r["listening"] is False
+    r = hear(); assert r["question"] is None and not r["listening"]                          # asleep: room chatter is ignored
+    assert c.post("/api/listen", json={"session_id": sid}).json()["listening"] is False       # and the answer-over ping cannot reopen it

@@ -34,7 +34,11 @@ def split_wake(heard: str, phrase: str = WAKE_PHRASE) -> tuple[bool, str]:
 
 COMMANDS = {"compact": "COMPACT", "compact it": "COMPACT",
             "handoff": "HANDOFF", "hand off": "HANDOFF", "hand it off": "HANDOFF",
-            "reset": "RESET", "start over": "RESET", "start again": "RESET"}
+            "reset": "RESET", "start over": "RESET", "start again": "RESET",
+            # the off button: closes the listening window until the wake phrase is said again
+            "stop": "SLEEP", "stop listening": "SLEEP", "go to sleep": "SLEEP", "sleep": "SLEEP", "be quiet": "SLEEP", "quiet": "SLEEP",
+            "thats all": "SLEEP", "that is all": "SLEEP", "thank you": "SLEEP", "thanks": "SLEEP", "goodbye": "SLEEP", "bye": "SLEEP",
+            "good night": "SLEEP", "never mind": "SLEEP", "nevermind": "SLEEP"}
 
 
 def spoken_command(heard: str) -> str | None:
