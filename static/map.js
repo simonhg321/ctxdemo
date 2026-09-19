@@ -51,9 +51,11 @@
   function applySurvive(s) {
     if (!s) return;
     for (const [id, gen] of s.kept || []) { const n = byId.get(id); if (n) { n.gen = gen; n.pulse = NOW(); } }
+    let i = 0;
     for (const [id, into] of s.absorbed || []) {
       const n = byId.get(id); if (!n) continue;
-      n.fading = NOW(); n.target = (into && byId.get(into)) || null; n.tx = W / 2; n.ty = H / 2;
+      n.fadeMs = 2600; n.fading = NOW() + 1200 + 350 * i++;   // a beat to read the map, then they go one by one
+      n.target = (into && byId.get(into)) || null; n.tx = W / 2; n.ty = H / 2;
       byId.delete(id); links = links.filter(l => l.source.id !== id && l.target.id !== id);
     }
     restart();
@@ -79,12 +81,15 @@
       const r = R(n.m), age = t - n.born;
       if (!n.fading) { n.x = Math.max(r + 24, Math.min(W - r - 24, n.x)); n.y = Math.max(r + 24, Math.min(H - r - 40, n.y)); }   // stay inside the frame
       if (n.fading) {                              // absorbed: drift into the survivor (or the centre) and fade over 1.2 s
-        const k = Math.min(1, (t - n.fading) / 1200);
+        const k = Math.max(0, Math.min(1, (t - n.fading) / (n.fadeMs || 1200)));
         const tx = n.target ? n.target.x : n.tx, ty = n.target ? n.target.y : n.ty;
-        n.fx = n.x += (tx - n.x) * 0.1; n.fy = n.y += (ty - n.y) * 0.1;
+        const pull = k > 0 ? (n.fadeMs ? 0.035 : 0.1) : 0;
+        n.fx = n.x += (tx - n.x) * pull; n.fy = n.y += (ty - n.y) * pull;
         if (k >= 1) { nodes.splice(i, 1); if (n.target) n.target.pulse = t; continue; }
         ctx.globalAlpha = 0.9 * (1 - k); ctx.fillStyle = amber;
-        ctx.beginPath(); ctx.arc(n.x, n.y, r * (1 - 0.5 * k), 0, 7); ctx.fill(); ctx.globalAlpha = 1; continue;
+        ctx.beginPath(); ctx.arc(n.x, n.y, r * (1 - 0.5 * k), 0, 7); ctx.fill();
+        if (n.fadeMs) { ctx.fillStyle = bone; ctx.font = '13px system-ui'; ctx.textAlign = 'center'; ctx.fillText(n.id, n.x, n.y + r + 19); }   // the word goes with the dot
+        ctx.globalAlpha = 1; continue;
       }
       const alpha = Math.max(0.35, 1 - 0.25 * n.gen);
       if (age < 2000) {                            // new or re-mentioned: green ring expanding out

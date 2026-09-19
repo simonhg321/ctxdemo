@@ -55,6 +55,12 @@
   .cam.mini video { max-height: 130px; }
   .micline { color: var(--dim); font-size: 13px; display: flex; gap: 8px; align-items: center; }
   #tab-map { padding-bottom: 16px; }
+  .compact-card { position: absolute; left: 50%; top: 8%; transform: translateX(-50%); width: min(78%, 900px); background: rgba(15,18,22,.93); border: 1px solid var(--ice); border-radius: 8px;
+    padding: 18px 24px; opacity: 0; pointer-events: none; transition: opacity 900ms; }
+  .compact-card.on { opacity: 1; }
+  .compact-card .k { color: var(--ice); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; }
+  .compact-card .s { font-size: clamp(16px, 1.5vw, 24px); line-height: 1.4; margin: 10px 0; max-height: 9.8em; overflow: hidden; }
+  .compact-card .c { color: var(--dim); font-size: clamp(16px, 1.4vw, 22px); } .compact-card .c b { color: var(--ice); font-weight: 600; } .compact-card .c b.lost { color: var(--amber); }
   .stage { position: relative; min-height: 0; }
   .ask { position: absolute; left: 16px; right: 16px; bottom: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
          color: var(--dim); font-size: 15px; transition: opacity 1.2s; pointer-events: none; }
@@ -419,14 +425,18 @@
     const chat = { insertAdjacentHTML: (w, h) => chats.forEach(c => c.insertAdjacentHTML(w, h)),
                    set innerHTML(v) { chats.forEach(c => c.innerHTML = v); },
                    get scrollHeight() { return 0; }, set scrollTop(v) { chats.forEach(c => c.scrollTop = c.scrollHeight); } };
+    let compactInfo = null, lastFull = null;
     const packAll = (turn, state) => { packs.forEach(p => packUpdate(p, turn, state)); tellWall(turn, state); };
     // framed in the split wall: hand the session's numbers up, the wall's context dials run on them (same origin only)
     function tellWall(turn, state) {
+      if (state && state.window_tokens && state.next_would_send != null) lastFull = Math.min(1, state.next_would_send / state.window_tokens);
       if (window.parent === window || !state) return;
       try {
         window.parent.postMessage({ ctxdemo: 1, id: state.id || null, n: state.n ?? (turn ? turn.n : 0), window_tokens: state.window_tokens,
           next_would_send: state.next_would_send ?? null, totals: state.totals || null,
+          compact: compactInfo,
           turn: turn ? { n: turn.n, typed_words: turn.typed_words, sent_tokens: turn.sent_tokens, new_tokens: turn.new_tokens, event: turn.event || null } : null }, location.origin);
+        compactInfo = null;
       } catch (e) {}
     }
     const readTxt = v => { $('read-txt').textContent = v; $('read-txt-map').textContent = v; };
@@ -463,7 +473,8 @@
     async function start() {
       chat.innerHTML = ''; readTotal = 0; readTxt('–'); $('read-cost').textContent = '';
       const teach = document.querySelector('nav button[data-tab=map]').getAttribute('aria-selected') === 'true';
-      const r = await api('session', { mode: $('board-mode').value, tools: $('board-tools').checked, board: true, teach });
+      const win = parseInt(new URLSearchParams(location.search).get('window'), 10) || undefined;   // ?window=2048: a smaller backpack for the wall
+      const r = await api('session', { mode: $('board-mode').value, tools: $('board-tools').checked, board: true, teach, window: win });
       sid = r.session_id; packAll(null, r.state); ctxMap.seed(r.state.graph); $('ask-strip').classList.remove('quiet');
     }
     async function turn(text) {
@@ -471,9 +482,10 @@
       try {
         if (!sid) await start();
         const r = await api('turn', { session_id: sid, text });
+        if (r.turn.event === 'compacted') showCompaction(r.turn.event_text, (r.turn.graph_delta || {}).survive, lastFull);   // before packAll: the wall gets was → now
         renderTurn(chat, r.turn); packAll(r.turn, r.state); ctxMap.applyDelta(r.turn.graph_delta);
         $('ask-strip').classList.toggle('quiet', (r.state.graph.nodes || []).length >= 6);
-        speak(r.turn.answer);
+        speak(r.turn.answer, keepListening);
       } catch (e) { note('red', String(e.message)); }
       finally { busy = false; cam.classList.remove('thinking'); }
     }
@@ -481,17 +493,22 @@
     // The mic is deaf while it talks (and a beat after), or the demo would hear itself and answer its own answer.
     const VOICE = !!new URLSearchParams(location.search).get('voice') && 'speechSynthesis' in window;
     let speaking = false;
-    function speak(answer) {
-      if (!VOICE || !answer) return;
+    async function keepListening() {               // the answer is over: reopen the follow-up window so nobody has to say the wake phrase twice
+      if (!sid || !mic) return;
+      try { const r = await api('listen', { session_id: sid }); if (r.listening) micState(`listening… ${r.listen_left} s — ask a follow-up`); } catch (e) {}
+    }
+    function speak(answer, after) {
+      if (!VOICE || !answer) { if (after) after(); return; }
       const plain = String(answer).replace(/```[\s\S]*?```/g, ' ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/https?:\/\/\S+/g, '').replace(/[*_#`>|]/g, '').replace(/\s+/g, ' ').trim();
       let say = (plain.match(/[^.!?]+[.!?]+/g) || [plain]).slice(0, 2).join(' ').trim();
       if (say.length > 320) say = say.slice(0, 320).replace(/\s+\S*$/, '') + '…';
-      if (!say) return;
+      if (!say) { if (after) after(); return; }
       const u = new SpeechSynthesisUtterance(say); u.rate = 1.02;
-      const done = () => setTimeout(() => { speaking = false; }, 700);
+      let fin = false;
+      const done = () => { if (fin) return; fin = true; setTimeout(() => { speaking = false; if (after) after(); }, 700); };
       u.onend = done; u.onerror = done;
       speaking = true; speechSynthesis.cancel(); speechSynthesis.speak(u);
-      setTimeout(() => { if (speaking && !speechSynthesis.speaking) speaking = false; }, 30000);   // never leave the mic deaf
+      setTimeout(() => { if (speaking && !speechSynthesis.speaking) done(); }, 30000);   // never leave the mic deaf
     }
     async function handoff() {
       if (busy || !sid) return; busy = true;
@@ -503,9 +520,29 @@
     }
     async function compactNow() {
       if (busy || !sid) return; busy = true;
-      try { const r = await api('compact', { session_id: sid }); note('', 'Compacted — the assistant kept this and threw the rest away', r.summary); packAll(null, r.state); ctxMap.applySurvive(r.graph_survive); }
+      try {
+        const before = lastFull;
+        const r = await api('compact', { session_id: sid }); note('', 'Compacted — the assistant kept this and threw the rest away', r.summary);
+        ctxMap.applySurvive(r.graph_survive);
+        const c = showCompaction(r.summary, r.graph_survive, before);
+        setTimeout(() => packAll(null, r.state), 2400);          // the meters drop once the dots have started to go
+        const things = n => n === 1 ? 'one thing' : n + ' things';
+        speak(`I summarized our chat and threw the transcript away. I kept ${things(c.kept)} and let ${things(c.forgot)} go.`, keepListening);
+      }
       catch (e) { note('red', String(e.message)); } finally { busy = false; }
     }
+    // the compaction moment, big enough for a wall: the summary over the map, what was kept, what was let go
+    function showCompaction(summary, survive, before) {
+      const kept = ((survive || {}).kept || []).length, forgot = ((survive || {}).absorbed || []).length;
+      let el = $('compact-card');
+      if (!el) { el = document.createElement('div'); el.id = 'compact-card'; el.className = 'compact-card'; document.querySelector('#tab-map .stage').appendChild(el); }
+      el.innerHTML = `<div class="k">compaction · the transcript is gone, this is what it remembers now</div><div class="s">${esc(summary || '')}</div>
+        <div class="c"><b>${kept}</b> kept · <b class="lost">${forgot}</b> let go</div>`;
+      el.classList.add('on'); clearTimeout(showCompaction.t); showCompaction.t = setTimeout(() => el.classList.remove('on'), 14000);
+      compactInfo = { kept, forgot, before };
+      return { kept, forgot };
+    }
+
     function snapshot() {
       const w = Math.min(1024, video.videoWidth || 1024), h = Math.round(w * (video.videoHeight || 576) / (video.videoWidth || 1024));
       const c = document.createElement('canvas'); c.width = w; c.height = h;

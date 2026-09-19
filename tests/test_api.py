@@ -185,3 +185,26 @@ def test_teach_session_uses_the_map_prompt(fake, cfg):
     sid = c.post("/api/session", json={"mode": "compact", "board": True, "teach": True}).json()["session_id"]
     c.post("/api/turn", json={"session_id": sid, "text": "hi"})
     assert fake.calls[-1]["messages"][0]["content"] == SYSTEM_MAP
+
+
+def test_listen_restarts_a_recent_window_only(fake, cfg):
+    from app.ears import HearResult
+    class FakeEars:
+        def health(self): return True
+        def transcribe(self, audio, mime): return HearResult("hi compact demo", 0.1)
+    app = create_app(vllm=fake, cfg=cfg, ears=FakeEars())
+    c = TestClient(app)
+    sid = c.post("/api/session", json={"mode": "endless", "board": True}).json()["session_id"]
+    assert c.post("/api/listen", json={"session_id": sid}).json()["listening"] is False      # never woken: stays shut
+    c.post("/api/hear", json={"session_id": sid, "audio": "QUJD"})
+    r = c.post("/api/listen", json={"session_id": sid}).json()
+    assert r["listening"] is True and r["listen_left"] == cfg.listen_seconds
+
+
+def test_board_session_window_override_is_clamped(fake, cfg):
+    c = TestClient(create_app(vllm=fake, cfg=cfg))
+    win = lambda body: c.post("/api/session", json=body).json()["state"]["window_tokens"]
+    assert win({"mode": "endless", "board": True, "window": 2048}) == 2048
+    assert win({"mode": "endless", "board": True, "window": 50}) == 1024
+    assert win({"mode": "endless", "board": True}) == cfg.board_window
+    assert win({"mode": "endless", "window": 2048}) == cfg.window_tokens                      # only the board tab

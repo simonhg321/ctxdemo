@@ -37,6 +37,7 @@ class NewSession(BaseModel):
     tools: bool = False          # let the assistant search the web
     board: bool = False          # whiteboard persona (short answers for a wall)
     teach: bool = False          # the map: longer lab-guide answers that invite the next question
+    window: int | None = None    # board sessions only: a smaller backpack for the wall, so a short chat visibly fills it
 
 
 class HearReq(BaseModel):
@@ -102,7 +103,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
     def new_session(req: NewSession = Body(...)):
         if req.mode not in ("endless", "compact", "handoff"):
             raise HTTPException(400, "mode must be endless|compact|handoff")
-        s = Session(req.mode, vllm, replace(cfg, window_tokens=cfg.board_window) if req.board else cfg,
+        board_window = max(1024, min(8192, req.window)) if req.window else cfg.board_window
+        s = Session(req.mode, vllm, replace(cfg, window_tokens=board_window) if req.board else cfg,
                     system_prompt=SYSTEM_MAP if req.teach else SYSTEM_BOARD if req.board else SYSTEM,
                     tools=tools if req.tools else None)
         sessions[s.id] = s
@@ -186,6 +188,16 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
             s.listening_until = now + cfg.listen_seconds       # a question keeps the window open
             out["listen_left"] = cfg.listen_seconds
         return out
+
+    @app.post("/api/listen")
+    def keep_listening(req: SessReq = Body(...)):
+        """The answer has finished (been read aloud): restart the follow-up window, if one was open recently.
+        Thinking + speaking used to eat the whole window, so a natural follow-up needed the wake phrase again."""
+        s = get(req.session_id)
+        now = time.time()
+        if s.listening_until > now - 120:
+            s.listening_until = now + cfg.listen_seconds
+        return {"listening": now < s.listening_until, "listen_left": max(0, round(s.listening_until - now))}
 
     @app.post("/api/look")
     def look(req: LookReq = Body(...)):
