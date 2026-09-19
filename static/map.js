@@ -116,8 +116,15 @@
       }
     }
     if (!nodes.length && !collapse) {
-      ctx.fillStyle = dim; ctx.font = '16px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText('say “hi compact demo” and ask something — the map draws what the model is holding', W / 2, H / 2);
+      ctx.textAlign = 'center';
+      if (document.documentElement.dataset.wall) {   // wall/split view: has to read from across the room
+        const px = Math.max(28, Math.min(64, W / 22));
+        ctx.fillStyle = amber; ctx.font = '600 ' + px + 'px system-ui'; ctx.fillText('say “hi compact demo”', W / 2, H / 2 - px * .2);
+        ctx.fillStyle = bone; ctx.font = Math.round(px * .45) + 'px system-ui'; ctx.fillText('then ask something — the map draws what the model is holding', W / 2, H / 2 + px * .8);
+      } else {
+        ctx.fillStyle = dim; ctx.font = '16px system-ui';
+        ctx.fillText('say “hi compact demo” and ask something — the map draws what the model is holding', W / 2, H / 2);
+      }
     }
   }
   function loop() { draw(); requestAnimationFrame(loop); }
