@@ -464,8 +464,25 @@
         const r = await api('turn', { session_id: sid, text });
         renderTurn(chat, r.turn); packAll(r.turn, r.state); ctxMap.applyDelta(r.turn.graph_delta);
         $('ask-strip').classList.toggle('quiet', (r.state.graph.nodes || []).length >= 6);
+        speak(r.turn.answer);
       } catch (e) { note('red', String(e.message)); }
       finally { busy = false; cam.classList.remove('thinking'); }
+    }
+    // ---- ?voice=1: read the answer aloud with the browser's own voice (no server). Only the opening, the rest is on the wall.
+    // The mic is deaf while it talks (and a beat after), or the demo would hear itself and answer its own answer.
+    const VOICE = !!new URLSearchParams(location.search).get('voice') && 'speechSynthesis' in window;
+    let speaking = false;
+    function speak(answer) {
+      if (!VOICE || !answer) return;
+      const plain = String(answer).replace(/```[\s\S]*?```/g, ' ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/https?:\/\/\S+/g, '').replace(/[*_#`>|]/g, '').replace(/\s+/g, ' ').trim();
+      let say = (plain.match(/[^.!?]+[.!?]+/g) || [plain]).slice(0, 2).join(' ').trim();
+      if (say.length > 320) say = say.slice(0, 320).replace(/\s+\S*$/, '') + '…';
+      if (!say) return;
+      const u = new SpeechSynthesisUtterance(say); u.rate = 1.02;
+      const done = () => setTimeout(() => { speaking = false; }, 700);
+      u.onend = done; u.onerror = done;
+      speaking = true; speechSynthesis.cancel(); speechSynthesis.speak(u);
+      setTimeout(() => { if (speaking && !speechSynthesis.speaking) speaking = false; }, 30000);   // never leave the mic deaf
     }
     async function handoff() {
       if (busy || !sid) return; busy = true;
@@ -525,10 +542,12 @@
       const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find(m => MediaRecorder.isTypeSupported(m)) || '';
       rec = new MediaRecorder(mic, mime ? { mimeType: mime } : {});
       rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
-      rec.onstop = () => { const b = new Blob(chunks, { type: rec.mimeType }); chunks = []; if (b.size > 2000) sendClip(b); };
+      const keepClip = () => { const b = new Blob(chunks, { type: rec.mimeType }); chunks = []; if (b.size > 2000) sendClip(b); };
+      rec.onstop = keepClip;
       micState(ac.state === 'suspended' ? 'mic asleep — click or press any key once' : 'say “hi compact demo”');
       setInterval(() => {
         if (!mic) return;
+        if (speaking) { if (recording) { recording = false; loudTicks = 0; chunks = []; rec.onstop = () => { chunks = []; rec.onstop = keepClip; }; rec.stop(); lvls.forEach(l => l.classList.remove('rec')); } lvls.forEach(l => l.style.setProperty('--w', '0%')); return; }
         an.getFloatTimeDomainData(buf); let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
         const rms = Math.sqrt(sum / buf.length);
         if (!recording) floor = floor * 0.98 + rms * 0.02;
