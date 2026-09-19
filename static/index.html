@@ -515,13 +515,18 @@
         mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true }, video: false });
       } catch (e) { micState('mic blocked: ' + e.message); return; }
       const ac = new (window.AudioContext || window.webkitAudioContext)();
+      // no click yet (kiosk, or framed in the split wall) = Chrome starts the context suspended and the analyser reads silence
+      const wakeAudio = () => { if (ac.state === 'suspended') ac.resume().then(() => micState('say “hi compact demo”')).catch(() => {}); };
+      window.ctxResumeAudio = wakeAudio;               // the split page forwards its own clicks/keys here
+      ['pointerdown', 'keydown', 'touchstart'].forEach(ev => window.addEventListener(ev, wakeAudio));
+      ac.resume().catch(() => {});
       const src = ac.createMediaStreamSource(mic), an = ac.createAnalyser(); an.fftSize = 1024; src.connect(an);
       const buf = new Float32Array(an.fftSize);
       const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find(m => MediaRecorder.isTypeSupported(m)) || '';
       rec = new MediaRecorder(mic, mime ? { mimeType: mime } : {});
       rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
       rec.onstop = () => { const b = new Blob(chunks, { type: rec.mimeType }); chunks = []; if (b.size > 2000) sendClip(b); };
-      micState('say “hi compact demo”');
+      micState(ac.state === 'suspended' ? 'mic asleep — click or press any key once' : 'say “hi compact demo”');
       setInterval(() => {
         if (!mic) return;
         an.getFloatTimeDomainData(buf); let sum = 0; for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
