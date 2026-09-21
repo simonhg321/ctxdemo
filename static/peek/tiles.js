@@ -5,6 +5,7 @@ peekPanels.tiles = (function () {
   return {
     mount(root) {
       el = root;
+      el.classList.add('row');
       el.innerHTML = ['sure', 'worst', 'pack'].map(k => `<div class="tile"><div class="cap" id="${k}-cap"></div><div class="big" id="${k}-big">—</div></div>`).join('');
       el.querySelector('#sure-cap').textContent = 'pieces it was sure about';
       el.querySelector('#worst-cap').textContent = 'biggest hesitation';

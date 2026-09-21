@@ -22,6 +22,11 @@ body { background: var(--ground); color: var(--bone); font: var(--u)/1.45 "Helve
 .bar-row.chosen .b i { background: var(--moss); } .bar-row.chosen .w { font-weight: 600; }
 .tile { border: 1px solid var(--line); background: var(--panel); border-radius: .3em; padding: .5em .7em; }
 .tile .big { font-size: 1.9em; font-weight: 600; line-height: 1.1; }
+#panel.row { flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
+#panel.row .tile { flex: 1 1 12em; min-width: 0; }
+#panel.row .tile .big { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#out { font-size: 1.8em; line-height: 1.5; flex: 1; min-height: 0; overflow-y: auto; }
+#strip { font-size: 1.5em; line-height: 1.6; }
 button, input[type=text] { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: .25em; padding: .4em .7em; }
 button { cursor: pointer; } button:hover { border-color: var(--dim); } button:disabled { opacity: .4; }
 input[type=text] { width: 100%; }
