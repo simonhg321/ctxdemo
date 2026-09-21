@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>ctxdemo · the guesses</title>
+<style>html,body{height:100%;margin:0;background:#0f1216;overflow:hidden} iframe{position:absolute;border:0;border-radius:6px;outline:1px solid #262d36}</style></head>
+<body><script>
+  // The frozen wall: positions in % of the screen.  wall.html?layout={"answer":[2,30,60,45],...}&room=wall&replay=1
+  const q = new URLSearchParams(location.search), room = q.get('room') || 'wall';
+  const DEFAULT = { driver: [2, 3, 60, 24], chunks: [64, 3, 34, 24], answer: [2, 30, 60, 45], almost: [64, 30, 34, 45], tiles: [2, 78, 96, 19] };
+  let layout = DEFAULT;
+  try { if (q.get('layout')) layout = JSON.parse(q.get('layout')); } catch (e) { console.error('bad ?layout=, using the default', e); }
+  for (const [name, [x, y, w, h]] of Object.entries(layout)) {
+    const f = document.createElement('iframe');
+    f.src = `panel.html?show=${encodeURIComponent(name)}&room=${encodeURIComponent(room)}` + (name === 'driver' && q.get('replay') === '1' ? '&replay=1' : '');
+    Object.assign(f.style, { left: x + '%', top: y + '%', width: w + '%', height: h + '%' });
+    document.body.appendChild(f);
+  }
+</script></body></html>

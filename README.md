@@ -41,3 +41,10 @@ and add `/demo /demo/*` to the `not path` line in `(common)`. Then `docker exec 
 - Replay without talking: http://localhost:8200/?replay=1#map plays `static/replay.json` (12 turns, compaction at 8,
   handoff at 12). Spec: `docs/specs/2026-09-12-ctxdemo-map-design.md`; plan: `docs/plans/2026-09-12-ctxdemo-map.md`.
 
+## Act 6 — The guesses (2026-09)
+How the model reads and chooses: the sentence in pieces (tokens), the answer coloured by how sure it was, and what it almost said.
+- Built from standalone panels: `static/peek/panel.html?show=driver|chunks|answer|almost|tiles&room=wall`. One Chrome, one machine (BroadcastChannel). Launch frameless: `chrome --app=<url>`; size them; then freeze the geometry into `static/peek/wall.html?layout={...}`.
+- Any panel + `&replay=1` plays canned turns with no model. `driver&replay=1` replays for every open panel.
+- Server: sessions created with `peek: true` ask the chat server for `logprobs` (same request on Ollama and vLLM). Chunks need `CTXDEMO_TOKENIZER` (HF repo of the chat model's tokenizer); unset → strip shows the plain sentence.
+- JS helper tests: `node --test static/peek/*.test.mjs`. Spec: `docs/specs/2026-09-21-ctxdemo-guesses-design.md`.
+

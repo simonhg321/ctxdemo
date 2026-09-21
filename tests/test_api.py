@@ -241,3 +241,12 @@ def test_peek_turn_and_health_chunks(fake, cfg):
 
 def test_health_chunks_false_without_a_tokenizer(client):
     assert client.get("/api/health").json()["chunks"] is False
+
+
+def test_act6_pages_are_served(client):
+    html = client.get("/").text
+    assert 'data-tab="guess"' in html and 'id="tab-guess"' in html
+    for f in ("panel.html", "wall.html", "bus.js", "lib.js", "peek.css", "replay.json",
+              "driver.js", "chunks.js", "answer.js", "almost.js", "tiles.js"):
+        assert client.get(f"/static/peek/{f}").status_code == 200, f
+    assert 'src="/' not in client.get("/static/peek/wall.html").text      # relative URLs only: we live under /demo/
