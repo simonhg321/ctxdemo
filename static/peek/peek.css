@@ -1,0 +1,27 @@
+:root { --ground: #0f1216; --panel: #171c22; --line: #262d36; --bone: #e6e1d6; --dim: #6b7480; --amber: #f2a93b; --ice: #7fc8e8; --red: #e0553c; --moss: #9bbf6a;
+  --u: clamp(12px, calc(1.1vw + 1.1vh), 40px); }   /* one unit that grows with the frame, so resizing a window rescales the panel */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--ground); color: var(--bone); font: var(--u)/1.45 "Helvetica Neue", "Segoe UI", system-ui, sans-serif; font-variant-numeric: tabular-nums; overflow: hidden; }
+#panel { height: 100%; padding: calc(var(--u) * .8); display: flex; flex-direction: column; gap: calc(var(--u) * .5); overflow: hidden; }
+.cap { color: var(--dim); font-size: .7em; letter-spacing: .06em; text-transform: uppercase; }
+.dim { color: var(--dim); }
+.piece { border-radius: .2em; padding: .05em 0; cursor: pointer; white-space: pre-wrap; border-bottom: .12em solid transparent; }
+.piece.sure { border-bottom-color: var(--moss); }
+.piece.unsure { border-bottom-color: var(--amber); background: rgba(242,169,59,.14); }
+.piece.flip { border-bottom-color: var(--red); background: rgba(224,85,60,.22); }
+.piece.ring { outline: .1em solid var(--ice); outline-offset: .1em; }
+.piece.focus { outline: .14em solid var(--bone); outline-offset: .1em; }
+.chunk { white-space: pre-wrap; border-radius: .2em; padding: .1em .05em; }
+.chunk:nth-child(odd) { background: rgba(127,200,232,.20); }
+.chunk:nth-child(even) { background: rgba(155,191,106,.20); }
+.bar-row { display: grid; grid-template-columns: minmax(4em, 38%) 1fr 3.2em; gap: .6em; align-items: center; }
+.bar-row .w { white-space: pre; overflow: hidden; text-overflow: ellipsis; text-align: right; }
+.bar-row .b { height: 1.1em; background: var(--line); border-radius: .2em; overflow: hidden; }
+.bar-row .b i { display: block; height: 100%; background: var(--dim); transition: width 500ms; }
+.bar-row.chosen .b i { background: var(--moss); } .bar-row.chosen .w { font-weight: 600; }
+.tile { border: 1px solid var(--line); background: var(--panel); border-radius: .3em; padding: .5em .7em; }
+.tile .big { font-size: 1.9em; font-weight: 600; line-height: 1.1; }
+button, input[type=text] { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: .25em; padding: .4em .7em; }
+button { cursor: pointer; } button:hover { border-color: var(--dim); } button:disabled { opacity: .4; }
+input[type=text] { width: 100%; }

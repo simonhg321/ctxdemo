@@ -1,0 +1,19 @@
+{"turns": [
+ {"turn": {"n": 1, "user": "Say hi", "answer": "Hi there!", "seconds": 1.2, "event": null, "event_text": null,
+   "user_chunks": ["Say", " hi"],
+   "tokens": [{"t": "Hi", "p": 0.7197, "alts": [{"t": "Hi", "p": 0.7197}, {"t": "Hello", "p": 0.2803}]},
+              {"t": " there", "p": 1.0, "alts": [{"t": " there", "p": 1.0}, {"t": " هناك", "p": 0.0}]},
+              {"t": "!", "p": 1.0, "alts": [{"t": "!", "p": 1.0}, {"t": "!\n", "p": 0.0}]}]},
+  "state": {"window_tokens": 4096, "next_would_send": 48}},
+ {"turn": {"n": 2, "user": "The Eiffel Tower is in the city of", "answer": "Paris, France.", "seconds": 1.6, "event": null, "event_text": null,
+   "user_chunks": ["The", " E", "iff", "el", " Tower", " is", " in", " the", " city", " of"],
+   "tokens": [{"t": "Paris", "p": 0.94, "alts": [{"t": "Paris", "p": 0.94}, {"t": "The", "p": 0.04}, {"t": "巴黎", "p": 0.01}]},
+              {"t": ",", "p": 0.62, "alts": [{"t": ",", "p": 0.62}, {"t": ".", "p": 0.37}]},
+              {"t": " France", "p": 0.97, "alts": [{"t": " France", "p": 0.97}, {"t": " the", "p": 0.02}]},
+              {"t": ".", "p": 0.99, "alts": [{"t": ".", "p": 0.99}, {"t": "!", "p": 0.01}]}]},
+  "state": {"window_tokens": 4096, "next_would_send": 96}},
+ {"turn": {"n": 3, "user": "Pick a number between 1 and 10", "answer": "7", "seconds": 0.9, "event": null, "event_text": null,
+   "user_chunks": ["Pick", " a", " number", " between", " ", "1", " and", " ", "1", "0"],
+   "tokens": [{"t": "7", "p": 0.41, "alts": [{"t": "7", "p": 0.41}, {"t": "5", "p": 0.22}, {"t": "3", "p": 0.17}, {"t": "4", "p": 0.11}, {"t": "8", "p": 0.06}]}]},
+  "state": {"window_tokens": 4096, "next_would_send": 131}}
+]}
