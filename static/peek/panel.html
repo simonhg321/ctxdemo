@@ -13,8 +13,8 @@
   if (q.get('scale')) document.documentElement.style.setProperty('--u', `calc(${parseFloat(q.get('scale')) || 1} * clamp(12px, calc(1.1vw + 1.1vh), 40px))`);
   document.title = 'ctxdemo · ' + show;
 
-  let cycle = null;
-  function stopCycle() { clearInterval(cycle); cycle = null; }
+  let cycle = null, pending = null;
+  function stopCycle() { clearTimeout(pending); pending = null; clearInterval(cycle); cycle = null; }
   window.peekStopCycle = stopCycle;
   // After a turn, walk the focus through the least-sure pieces so an unattended wall still teaches.
   function autoSelect(msg, pick) {
@@ -23,7 +23,7 @@
     if (!hs.length) return;
     const wait = peekLib.revealDelay(msg.turn.seconds || 2, toks.length) * toks.length + 600;
     let k = 0;
-    setTimeout(() => { pick(hs[0]); cycle = setInterval(() => pick(hs[++k % hs.length]), 4000); }, wait);
+    pending = setTimeout(() => { pending = null; pick(hs[0]); cycle = setInterval(() => pick(hs[++k % hs.length]), 4000); }, wait);
   }
 
   const s = document.createElement('script');
