@@ -9,6 +9,7 @@ from .session import Session, SYSTEM, SYSTEM_BOARD, SYSTEM_MAP
 from .jobs import RaceJob
 from .vllm import VLLM
 from .tools import Tools
+from .chunks import Chunker
 from .ears import Ears, split_wake, spoken_command
 from . import grader
 import difflib, re, os, base64, logging, time
@@ -38,6 +39,7 @@ class NewSession(BaseModel):
     board: bool = False          # whiteboard persona (short answers for a wall)
     teach: bool = False          # the map: longer lab-guide answers that invite the next question
     window: int | None = None    # board sessions only: a smaller backpack for the wall, so a short chat visibly fills it
+    peek: bool = False           # act 6: return the guesses behind each piece of the answer
 
 
 class HearReq(BaseModel):
@@ -65,7 +67,7 @@ class ListenReq(BaseModel):
     off: bool = False            # the off button: close the window now
 
 
-def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastAPI:
+def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=None) -> FastAPI:
     cfg = cfg or config.load()
     if ears is None and cfg.ears_url:
         ears = Ears(cfg.ears_url)
@@ -74,6 +76,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
         vision = vllm if (cfg.vision_url in ("", cfg.vllm_url) and cfg.vision_model in ("", cfg.model)) \
             else VLLM(cfg.vision_url or cfg.vllm_url, cfg.vision_model or cfg.model)
     tools = tools or Tools()
+    chunker = chunker or Chunker(cfg.tokenizer_repo)
     scr = script_mod.load()
     app = FastAPI(title="ctxdemo")
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
@@ -98,7 +101,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
                 "exact_counts": getattr(vllm, "exact", True), "board_window": cfg.board_window,
                 "ears": ("ok" if ears.health() else "down") if ears else "none", "listen_seconds": cfg.listen_seconds,
                 "compact_at": cfg.compact_at, "handoff_turn": cfg.handoff_turn, "script_turns": len(scr.turns),
-                "prices": cfg.prices}
+                "prices": cfg.prices, "chunks": bool(getattr(chunker, "available", False))}
 
     @app.get("/api/script")
     def get_script():
@@ -111,7 +114,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None) -> FastA
         board_window = max(1024, min(8192, req.window)) if req.window else cfg.board_window
         s = Session(req.mode, vllm, replace(cfg, window_tokens=board_window) if req.board else cfg,
                     system_prompt=SYSTEM_MAP if req.teach else SYSTEM_BOARD if req.board else SYSTEM,
-                    tools=tools if req.tools else None)
+                    tools=tools if req.tools else None, peek=req.peek, chunker=chunker)
         sessions[s.id] = s
         return {"session_id": s.id, "state": s.state()}
 

@@ -224,3 +224,20 @@ def test_spoken_stop_closes_the_window_and_followup_is_short(fake, cfg):
     r = hear(); assert r["command"] == "SLEEP" and r["listening"] is False
     r = hear(); assert r["question"] is None and not r["listening"]                          # asleep: room chatter is ignored
     assert c.post("/api/listen", json={"session_id": sid}).json()["listening"] is False       # and the answer-over ping cannot reopen it
+
+
+def test_peek_turn_and_health_chunks(fake, cfg):
+    class WordChunker:
+        available = True
+        def split(self, text): return text.split()
+    c = TestClient(create_app(vllm=fake, cfg=cfg, chunker=WordChunker()))
+    assert c.get("/api/health").json()["chunks"] is True
+    sid = c.post("/api/session", json={"mode": "compact", "board": True, "peek": True}).json()["session_id"]
+    t = c.post("/api/turn", json={"session_id": sid, "text": "hi there"}).json()["turn"]
+    assert t["user_chunks"] == ["hi", "there"] and t["tokens"][0]["alts"][0]["p"] == 0.9
+    sid2 = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
+    assert c.post("/api/turn", json={"session_id": sid2, "text": "hi"}).json()["turn"]["tokens"] == []
+
+
+def test_health_chunks_false_without_a_tokenizer(client):
+    assert client.get("/api/health").json()["chunks"] is False

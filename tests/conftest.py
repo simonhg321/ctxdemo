@@ -16,13 +16,14 @@ class FakeVLLM:
     def count(self, text): return len((text or "").split())
     def count_messages(self, messages): return sum(self.count(text_of(m.get("content"))) + 4 for m in messages)
 
-    def chat(self, messages, max_tokens, tools=None):
-        self.calls.append({"messages": [dict(m) for m in messages], "max_tokens": max_tokens, "tools": tools})
+    def chat(self, messages, max_tokens, tools=None, peek=False):
+        self.calls.append({"messages": [dict(m) for m in messages], "max_tokens": max_tokens, "tools": tools, "peek": peek})
         nxt = self.responses.pop(0) if self.responses else "Echo: " + text_of(messages[-1].get("content"))
         if isinstance(nxt, ChatResult):
             nxt.prompt_tokens = self.count_messages(messages); return nxt
+        toks = [{"t": w, "p": 0.9, "alts": [{"t": w, "p": 0.9}]} for w in nxt.split()] if peek else []
         return ChatResult(text=nxt, prompt_tokens=self.count_messages(messages),
-                          completion_tokens=self.count(nxt), seconds=0.01)
+                          completion_tokens=self.count(nxt), seconds=0.01, tokens=toks)
 
     def look(self, image_b64, prompt, max_tokens=120, mime="image/jpeg"):
         text = self.looks.pop(0) if self.looks else "NONE"

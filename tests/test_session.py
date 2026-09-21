@@ -1,5 +1,7 @@
 import pytest
+from dataclasses import replace
 from app.session import Session
+from app.chunks import Chunker
 
 
 def words(n): return " ".join(["w"] * n)
@@ -151,3 +153,31 @@ def test_handoff_seeds_graph_from_note(fake, cfg):
     assert h.graph_survive == {"kept": [["alpha", 1]], "absorbed": [["beta", "alpha"]]}
     assert [n["label"] for n in h.new_session.state()["graph"]["nodes"]] == ["alpha"]
     assert set(s.graph.nodes) == {"alpha", "beta"}          # old session untouched
+
+
+class WordChunker:
+    available = True
+    def split(self, text): return text.split()
+
+
+def test_peek_session_carries_pieces_and_chunks(fake, cfg):
+    s = Session("endless", fake, cfg, peek=True, chunker=WordChunker())
+    tr = s.turn("pick a number")
+    assert [t["t"] for t in tr.tokens] == ["Echo:", "pick", "a", "number"]
+    assert tr.user_chunks == ["pick", "a", "number"]
+    assert fake.calls[-1]["peek"] is True
+
+
+def test_only_answer_calls_peek(fake, cfg):
+    s = Session("compact", fake, replace(cfg, extract=True), peek=True)      # window 400, compacts at 320
+    for i in range(16):
+        s.turn("tell me a long story about lighthouses and fog please")
+    assert any(c["max_tokens"] == cfg.summary_max_tokens for c in fake.calls)      # it did compact at least once
+    side = [c["peek"] for c in fake.calls if c["max_tokens"] in (cfg.summary_max_tokens, cfg.extract_max_tokens)]
+    assert side and not any(side)                             # compaction + extraction never peek
+    assert all(c["peek"] for c in fake.calls if c["max_tokens"] == cfg.answer_max_tokens)
+
+
+def test_plain_session_is_untouched(fake, cfg):
+    tr = Session("endless", fake, cfg).turn("hello")
+    assert tr.tokens == [] and tr.user_chunks == [] and fake.calls[-1]["peek"] is False
