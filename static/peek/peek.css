@@ -10,8 +10,8 @@ body { background: var(--ground); color: var(--bone); font: var(--u)/1.45 "Helve
 .piece.sure { border-bottom-color: var(--moss); }
 .piece.unsure { border-bottom-color: var(--amber); background: rgba(242,169,59,.14); }
 .piece.flip { border-bottom-color: var(--red); background: rgba(224,85,60,.22); }
-.piece.ring { outline: .1em solid var(--ice); outline-offset: .1em; }
-.piece.focus { outline: .14em solid var(--bone); outline-offset: .1em; }
+.piece.ring { box-shadow: inset 0 0 0 .07em var(--ice); }
+.piece.focus { box-shadow: inset 0 0 0 .1em var(--bone); background: rgba(230,225,214,.16); }
 .chunk { white-space: pre-wrap; border-radius: .2em; padding: .1em .05em; }
 .chunk:nth-child(odd) { background: rgba(127,200,232,.20); }
 .chunk:nth-child(even) { background: rgba(155,191,106,.20); }

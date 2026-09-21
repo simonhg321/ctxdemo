@@ -14,6 +14,8 @@ test('hesitations: lowest first, skips blank pieces', () => {
   const toks = [T('A', 0.99), T(' ', 0.1), T('B', 0.4, 'C'), T('D', 0.6, 'E'), T('\n', 0.2), T('F', 0.95)];
   assert.deepEqual(L.hesitations(toks, 2), [2, 3]);
   assert.deepEqual(L.hesitations([], 3), []);
+  assert.deepEqual(L.hesitations(toks), [2, 3]);
+  assert.deepEqual(L.hesitations([T('A', 0.99), T('B', 0.95)]), []);
 });
 test('stats', () => {
   const s = L.stats([T('A', 0.99), T('B', 0.4, 'C'), T('D', 0.95)]);

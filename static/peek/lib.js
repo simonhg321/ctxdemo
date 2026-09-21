@@ -4,7 +4,7 @@
   const pct = p => (p > 0 && p < 0.005 ? '<1%' : Math.round(p * 100) + '%');
   const isBlank = t => !String(t || '').trim();
   function hesitations(tokens, k = 3) {
-    return (tokens || []).map((t, i) => ({ i, p: t.p, t: t.t })).filter(x => !isBlank(x.t))
+    return (tokens || []).map((t, i) => ({ i, p: t.p, t: t.t })).filter(x => !isBlank(x.t) && x.p < 0.9)
       .sort((a, b) => a.p - b.p || a.i - b.i).slice(0, k).map(x => x.i).sort((a, b) => a - b);
   }
   function stats(tokens) {
