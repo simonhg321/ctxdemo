@@ -18,7 +18,7 @@
     let layout = DEFAULT;
     if (q.get('layout')) {
       const parsed = JSON.parse(q.get('layout'));
-      const valid = Object.values(parsed).every(v => Array.isArray(v) && v.length === 4 && v.every(Number.isFinite));
+      const valid = parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0 && Object.values(parsed).every(v => Array.isArray(v) && v.length === 4 && v.every(Number.isFinite));
       if (!valid) throw new Error('malformed ?layout= value');
       layout = parsed;
     }
