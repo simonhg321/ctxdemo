@@ -167,7 +167,11 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         d = tr.to_dict()
         d["asks"] = asks
         d["remembered"] = {a: grader.remembered(tr.answer, scr.details[a]) for a in asks}
-        turnlog.write(s.id, tab_of(s), text, tr.answer, tr.seconds, tr.tokens, source=req.source or "typed", persona=s.persona)
+        turnlog.write(s.id, tab_of(s), text, tr.answer, tr.seconds, tr.tokens, source=req.source or "typed", persona=s.persona,
+                      full={"n": tr.n, "system": s.system, "user_chunks": tr.user_chunks, "pieces": tr.tokens, "cut": tr.cut,
+                            "sent_tokens": tr.sent_tokens, "new_tokens": tr.new_tokens, "breakdown": tr.breakdown,
+                            "event": tr.event, "event_text": tr.event_text, "tool_uses": tr.tool_uses,
+                            "window_tokens": s.cfg.window_tokens, "max_tokens": s.cfg.answer_max_tokens, "model": vllm.model})
         return {"turn": d, "state": s.state()}
 
     @app.post("/api/handoff")

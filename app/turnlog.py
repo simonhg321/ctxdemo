@@ -28,7 +28,10 @@ class TurnLog:
         self.enabled = self.path is not None
 
     def write(self, session_id: str, tab: str, user: str, answer: str | None, seconds: float,
-              tokens: list[dict] | None = None, source: str = "typed", persona: str | None = None) -> None:
+              tokens: list[dict] | None = None, source: str = "typed", persona: str | None = None,
+              full: dict | None = None) -> None:
+        """`full` = everything else about the turn (every piece with its guesses, the chunks, tool calls,
+        the system prompt, the counts) — Simon wants to study it later, so keep it all; ~300 KB for a 3k-piece answer."""
         if not self.enabled:
             return
         rec = {"ts": time.strftime("%Y-%m-%d %H:%M:%S"), "session": session_id, "tab": tab, "source": source,
@@ -37,6 +40,8 @@ class TurnLog:
             rec["guesses"] = hesitations(tokens)
         if persona is not None:
             rec["persona"] = persona
+        if full:
+            rec.update(full)
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as f:

@@ -63,3 +63,15 @@ def test_turn_writes_nothing_by_default(fake, cfg, tmp_path, monkeypatch):
     sid = c.post("/api/session", json={"mode": "compact"}).json()["session_id"]
     c.post("/api/turn", json={"session_id": sid, "text": "say hi"})
     assert not list(tmp_path.iterdir())
+
+
+def test_turn_log_keeps_every_piece_and_the_system_prompt(fake, cfg, tmp_path):
+    path = tmp_path / "turns.jsonl"
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, turnlog=str(path))))
+    sid = c.post("/api/session", json={"mode": "compact", "board": True, "peek": True}).json()["session_id"]
+    fake.responses.append("Hello there")
+    c.post("/api/turn", json={"session_id": sid, "text": "say hi"})
+    rec = json.loads(path.read_text().splitlines()[0])
+    assert [p["t"] for p in rec["pieces"]] == ["Hello", "there"] and rec["pieces"][0]["alts"]
+    assert "university lab" in rec["system"] and rec["window_tokens"] == 1600 and rec["max_tokens"] == cfg.answer_max_tokens
+    assert rec["cut"] is False and rec["tool_uses"] == [] and rec["model"] == "fake"
