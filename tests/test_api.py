@@ -273,9 +273,9 @@ def test_act6_pages_are_served(client):
 
 def test_session_max_tokens_is_clamped_and_used(fake, cfg):
     c = TestClient(create_app(vllm=fake, cfg=cfg))
-    sid = c.post("/api/session", json={"mode": "endless", "max_tokens": 9000}).json()["session_id"]
+    sid = c.post("/api/session", json={"mode": "endless", "max_tokens": 90000}).json()["session_id"]
     c.post("/api/turn", json={"session_id": sid, "text": "hi"})
-    assert fake.calls[-1]["max_tokens"] == 1500                       # clamped to the ceiling
+    assert fake.calls[-1]["max_tokens"] == 10000                      # clamped to the ceiling
     sid = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
     c.post("/api/turn", json={"session_id": sid, "text": "hi"})
     assert fake.calls[-1]["max_tokens"] == cfg.answer_max_tokens      # unset: unchanged

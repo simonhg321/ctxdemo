@@ -37,8 +37,8 @@ test('personaModel: marks the active persona, custom handled elsewhere', () => {
 });
 test('personaSessionFields: persona id, or custom free text', () => {
   assert.deepEqual(L.personaSessionFields(null), {});
-  assert.deepEqual(L.personaSessionFields({ id: 'pirate', prompt: 'Arr' }), { persona: 'pirate', max_tokens: 1000 });
-  assert.deepEqual(L.personaSessionFields({ id: 'custom', prompt: 'be nice' }), { system: 'be nice', max_tokens: 1000 });
+  assert.deepEqual(L.personaSessionFields({ id: 'pirate', prompt: 'Arr' }), { persona: 'pirate', max_tokens: 10000 });
+  assert.deepEqual(L.personaSessionFields({ id: 'custom', prompt: 'be nice' }), { system: 'be nice', max_tokens: 10000 });
 });
 test('explainParse: label from line 1, paragraphs and bullet lists split on blank lines', () => {
   const md = '# guesses\nFirst para **bold**.\n\nSecond para.\n\n- one\n- two\n\nThird para.\n';
