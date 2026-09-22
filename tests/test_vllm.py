@@ -100,3 +100,10 @@ def test_peek_adds_fields_and_default_body_is_unchanged():
                          "temperature": 0, "chat_template_kwargs": {"enable_thinking": False}}
     assert bodies[1]["logprobs"] is True and bodies[1]["top_logprobs"] == 5
     assert plain.tokens == [] and [t["t"] for t in peeked.tokens] == ["Hi", " there"]
+
+
+def test_parse_logprobs_drops_end_of_turn_marker():
+    choice = {"logprobs": {"content": [
+        {"token": "Hi", "logprob": -0.1, "top_logprobs": [{"token": "Hi", "logprob": -0.1}]},
+        {"token": "<|im_end|>", "logprob": -0.01, "top_logprobs": [{"token": "<|im_end|>", "logprob": -0.01}]}]}}
+    assert [t["t"] for t in parse_logprobs(choice)] == ["Hi"]        # vLLM lists the stop token as a piece; Ollama does not

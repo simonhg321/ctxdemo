@@ -1,7 +1,7 @@
 """Client for an OpenAI-compatible chat server: vLLM (exact token counts via /tokenize) or Ollama (no
 /tokenize — counts before sending are estimated, counts after sending are real from `usage`)."""
 from __future__ import annotations
-import json, math, time
+import json, math, re, time
 from dataclasses import dataclass, field
 import httpx
 
@@ -45,12 +45,17 @@ def _prob(it: dict) -> float:
     return round(math.exp(min(0.0, float(it.get("logprob", 0.0)))), 4)
 
 
+_SPECIAL = re.compile(r"<\|[a-z_]+\|>")
+
+
 def parse_logprobs(choice: dict | None) -> list[dict]:
     """OpenAI-format logprobs (same from Ollama and vLLM) -> [{t, p, alts}]. Never raises; anything odd -> []."""
     try:
         out = []
         for it in ((choice or {}).get("logprobs") or {}).get("content") or []:
             me = {"t": _piece(it), "p": _prob(it)}
+            if _SPECIAL.fullmatch(me["t"]):        # vLLM lists the end-of-turn marker (<|im_end|>) as a piece; it is not part of the answer
+                continue
             alts = [{"t": _piece(a), "p": _prob(a)} for a in (it.get("top_logprobs") or [])]
             if me not in alts:
                 alts.append(me)
