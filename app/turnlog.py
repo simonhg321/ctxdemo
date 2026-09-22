@@ -29,7 +29,7 @@ class TurnLog:
 
     def write(self, session_id: str, tab: str, user: str, answer: str | None, seconds: float,
               tokens: list[dict] | None = None, source: str = "typed", persona: str | None = None,
-              full: dict | None = None) -> None:
+              full: dict | None = None, name: str | None = None) -> None:
         """`full` = everything else about the turn (every piece with its guesses, the chunks, tool calls,
         the system prompt, the counts) — Simon wants to study it later, so keep it all; ~300 KB for a 3k-piece answer."""
         if not self.enabled:
@@ -40,6 +40,8 @@ class TurnLog:
             rec["guesses"] = hesitations(tokens)
         if persona is not None:
             rec["persona"] = persona
+        if name:
+            rec["name"] = name
         if full:
             rec.update(full)
         try:

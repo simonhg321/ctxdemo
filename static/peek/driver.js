@@ -3,6 +3,11 @@ peekPanels.driver = (function () {
   let el, sid = null, busy = false, lastTurn = null, lastSelect = null, persona = null, web = false, pack = 4096, compact = true;   // web: the web_search tool; window/compact: the backpack size and whether it compacts at 95% (off = overflow on purpose)
   const API = '../../api/';                                  // relative: the app lives under /demo/ behind Caddy
   let audience = false;                                      // Linode: the server clamps plain visitors (4k, 600 tokens, no web) and says so in /api/health
+  let queueTimer = null;
+  const nameOf = () => { const n = el.querySelector('#name'); return n && n.value.trim() ? n.value.trim().slice(0, 24) : undefined; };
+  async function watchQueue() {                              // while an answer is in flight: how many others the GPU is serving
+    try { const q = (await (await fetch(API + 'queue')).json()).queue; const line = peekLib.queueLine(q); if (busy) status('thinking…' + (line ? '  ·  ' + line : '')); } catch (e) { /* keep the old line */ }
+  }
   async function post(path, body) {
     const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
@@ -11,14 +16,16 @@ peekPanels.driver = (function () {
   async function ask(text) {
     text = (text || '').trim(); if (!text || busy) return;
     busy = true; status('thinking…'); el.querySelectorAll('button,input').forEach(b => b.disabled = true);
+    watchQueue(); queueTimer = setInterval(watchQueue, 2000);
     try {
       if (!sid) sid = (await post('session', Object.assign({ mode: compact ? 'compact' : 'endless', board: true, peek: true, tools: web, window: pack }, peekLib.personaSessionFields(persona)))).session_id;
-      const r = await post('turn', { session_id: sid, text });
+      const r = await post('turn', { session_id: sid, text, name: nameOf() });
       sendTurn(r);
       const searched = (r.turn.tool_uses || []).map(u => (u.args || {}).query || u.name).join(' · ');
       status(r.turn.event === 'compacted' ? 'the backpack was full — it compacted first' : searched ? 'searched the web: ' + searched : '');
       el.querySelector('#q').value = '';
     } catch (e) { status('error: ' + e.message); if (/no such session/.test(e.message)) sid = null; }   // show the real error; a restart forgets sessions
+    clearInterval(queueTimer); queueTimer = null;
     busy = false; el.querySelectorAll('button,input').forEach(b => b.disabled = false); el.querySelector('#q').focus();
   }
   function status(s) { el.querySelector('#st').textContent = s; }
@@ -30,11 +37,12 @@ peekPanels.driver = (function () {
     mount(root) {
       el = root;
       el.innerHTML = '<div class="cap">ask the model</div><form id="f" style="display:flex;gap:.5em"><input type="text" id="q" placeholder="type a question" autocomplete="off"><button>Ask</button></form>' +
-        '<div id="asks" style="display:flex;flex-wrap:wrap;gap:.3em;font-size:.8em"></div><div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;font-size:.9em"><button id="new" type="button">Start over</button><button id="web" type="button" title="give it web search (a fresh session)">🌐 web: off</button><button id="win" type="button" title="backpack size (a fresh session)">🎒 4k</button><button id="cmp" type="button" title="compact at 95% full, or let it overflow (a fresh session)">compact: on</button><span id="st" class="dim"></span></div>';
+        '<div id="asks" style="display:flex;flex-wrap:wrap;gap:.3em;font-size:.8em"></div><div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;font-size:.9em"><button id="new" type="button">Start over</button><button id="web" type="button" title="give it web search (a fresh session)">🌐 web: off</button><button id="win" type="button" title="backpack size (a fresh session)">🎒 4k</button><button id="cmp" type="button" title="compact at 95% full, or let it overflow (a fresh session)">compact: on</button><input type="text" id="name" placeholder="your first name (optional)" maxlength="24" autocomplete="off" style="width:auto;flex:0 1 14em;display:none" title="shows next to your questions on the presenter\'s screen"><span id="st" class="dim"></span></div>';
       const drawAsks = () => {
         const box = el.querySelector('#asks'); box.innerHTML = '';
         peekLib.asksFor(audience).forEach(a => { const b = document.createElement('button'); b.type = 'button'; b.textContent = a; b.onclick = () => ask(a); box.appendChild(b); });
         ['#web', '#win', '#cmp'].forEach(id => { el.querySelector(id).style.display = audience ? 'none' : ''; });   // the shared GPU's knobs are the presenter's
+        el.querySelector('#name').style.display = audience ? '' : 'none';                                          // the name box is for the room, i.e. the audience
       };
       drawAsks();
       fetch(API + 'health').then(r => r.json()).then(h => { audience = !!h.audience; drawAsks(); }).catch(() => {});

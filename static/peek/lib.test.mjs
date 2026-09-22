@@ -109,3 +109,9 @@ test('wallFit: stacked on laptops, frozen on the big screen, explicit ?fit= wins
   assert.equal(L.wallFit(1440, null), 'stack'); assert.equal(L.wallFit(3840, null), 'frozen');
   assert.equal(L.wallFit(3840, 'stack'), 'stack'); assert.equal(L.wallFit(1280, 'frozen'), 'frozen');
 });
+test('queueLine: what the ask box says while waiting', () => {
+  assert.equal(L.queueLine(null), '');
+  assert.equal(L.queueLine({ running: 0, waiting: 0 }), '');
+  assert.equal(L.queueLine({ running: 1, waiting: 0 }), '1 answering');
+  assert.equal(L.queueLine({ running: 4, waiting: 2 }), '4 answering · 2 waiting');
+});

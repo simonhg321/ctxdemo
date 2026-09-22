@@ -338,3 +338,32 @@ def test_driver_and_wall_use_the_audience_helpers(client):
     assert "peekLib.asksFor(" in d and "audience" in d
     w = client.get("/static/peek/wall.html").text
     assert "peekLib.wallFit(" in w and "stack" in w
+
+
+def test_queue_endpoint_passes_through_or_says_none(fake, cfg):
+    c = TestClient(create_app(vllm=fake, cfg=cfg))
+    assert c.get("/api/queue").json() == {"queue": None}          # the fake has no /metrics
+    fake.queue = lambda: {"running": 1, "waiting": 4, "kv_pct": 7}
+    assert c.get("/api/queue").json() == {"queue": {"running": 1, "waiting": 4, "kv_pct": 7}}
+
+
+def test_room_feed_keeps_recent_turns_with_optional_names_and_is_presenter_only(fake, cfg):
+    from dataclasses import replace
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, audience=True)))
+    sid = c.post("/api/session", json={"mode": "compact", "board": True, "peek": True}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "hi there", "name": "  Priya <b>x</b> with a very long name indeed  "})
+    c.post("/api/turn", json={"session_id": sid, "text": "again"})
+    assert c.get("/api/room").status_code == 403                    # the audience cannot read the room
+    r = c.get("/api/room", headers={"X-Presenter": "1"}).json()["turns"]
+    assert len(r) == 2 and r[0]["user"] == "again" and r[1]["user"] == "hi there"          # newest first
+    assert r[1]["name"] == "Priya <b>x</b> with a ve" and r[0]["name"] == r[1]["name"]      # trimmed to 24 chars; sticks to the session; the page escapes
+    assert set(r[0]) >= {"ts", "name", "user", "answer", "seconds", "persona", "sure_pct", "worst", "session"}
+    assert r[0]["session"] != sid                                    # a short public id, not the real session id
+    g = TestClient(create_app(vllm=fake, cfg=cfg))                  # Gonzaga: no audience mode, room open (nobody hostile on the LAN)
+    assert g.get("/api/room").json() == {"turns": []}
+
+
+def test_room_panel_and_driver_name_box_are_served(client):
+    assert client.get("/static/peek/room.js").status_code == 200
+    d = client.get("/static/peek/driver.js").text
+    assert "queueLine" in d and "'queue'" in d and 'id="name"' in d

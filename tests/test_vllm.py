@@ -145,3 +145,12 @@ def test_trim_wire_keeps_the_first_pieces_and_says_how_many_there_were():
     assert len(content) == 100                                   # the original is untouched
     assert trim_wire(None) is None
     assert trim_wire({"request": {}, "response": {"choices": []}})["total"] == 0
+
+
+def test_queue_parses_vllm_metrics_and_is_none_without_them():
+    metrics = ('# HELP vllm:num_requests_running x\nvllm:num_requests_running{engine="0",model_name="m"} 3.0\n'
+               'vllm:num_requests_waiting{engine="0",model_name="m"} 2.0\nvllm:kv_cache_usage_perc{engine="0",model_name="m"} 0.42\n')
+    v = VLLM("http://x", "m", transport=httpx.MockTransport(lambda r: httpx.Response(200, text=metrics)))
+    assert v.queue() == {"running": 3, "waiting": 2, "kv_pct": 42}
+    v2 = VLLM("http://x", "m", transport=httpx.MockTransport(lambda r: httpx.Response(404)))
+    assert v2.queue() is None

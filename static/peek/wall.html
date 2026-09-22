@@ -16,6 +16,7 @@ body.stack iframe[data-panel=answer]{grid-column:1/-1;height:60vh}
 body.stack iframe[data-panel=persona]{height:70vh}
 body.stack iframe[data-panel=almost]{height:70vh}
 body.stack iframe[data-panel=tiles]{grid-column:1/-1;height:22vh}
+body.stack iframe[data-panel=room]{grid-column:1/-1;height:70vh}
 @media (max-width:900px){body.stack #wall-frames{grid-template-columns:1fr} body.stack iframe[data-panel=persona],body.stack iframe[data-panel=almost]{height:55vh}}
 #wire-overlay{position:fixed;inset:0;z-index:25;display:none;background:rgba(4,6,8,.78)}
 #wire-overlay.open{display:block}
@@ -40,6 +41,7 @@ body.stack iframe[data-panel=tiles]{grid-column:1/-1;height:22vh}
   }
   try {
     let layout = DEFAULT;
+    if (q.get('with') === 'room') layout = Object.assign({}, DEFAULT, { almost: [64, 51, 34, 12], room: [64, 64, 34, 33], tiles: [2, 79, 60, 18] });   // presenter: the room feed on the right
     if (q.get('layout')) {
       const parsed = JSON.parse(q.get('layout'));
       const valid = parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0 && Object.values(parsed).every(v => Array.isArray(v) && v.length === 4 && v.every(Number.isFinite));

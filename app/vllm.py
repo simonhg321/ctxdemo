@@ -99,6 +99,24 @@ class VLLM:
         except httpx.HTTPError:
             return False
 
+    def queue(self) -> dict | None:
+        """vLLM's Prometheus /metrics -> {running, waiting, kv_pct}. None when the server has none (Ollama) or it fails."""
+        try:
+            r = self._c.get("/metrics", timeout=3)
+            if r.status_code != 200:
+                return None
+            vals = {}
+            for line in r.text.splitlines():
+                for key in ("num_requests_running", "num_requests_waiting", "kv_cache_usage_perc"):
+                    if line.startswith(f"vllm:{key}{{") or line.startswith(f"vllm:{key} "):
+                        vals[key] = float(line.rsplit(" ", 1)[1])
+            if "num_requests_running" not in vals:
+                return None
+            return {"running": int(vals["num_requests_running"]), "waiting": int(vals.get("num_requests_waiting", 0)),
+                    "kv_pct": round(100 * vals.get("kv_cache_usage_perc", 0.0))}
+        except (httpx.HTTPError, ValueError):
+            return None
+
     def _chat(self, body: dict) -> ChatResult:
         t0 = time.time()
         r = self._c.post("/v1/chat/completions", json=body)

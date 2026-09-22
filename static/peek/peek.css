@@ -70,3 +70,11 @@ mark { background: rgba(242,169,59,.35); color: var(--bone); border-radius: .2em
 .explain-persona { border: 1px solid var(--line); border-radius: .3em; padding: .5em .7em; margin-bottom: .5em; }
 .explain-persona.active { border-color: var(--ice); box-shadow: inset 0 0 0 .07em var(--ice); }
 .explain-persona-body { white-space: pre-wrap; font-size: .85em; margin-top: .2em; }
+
+/* the room (presenter feed) */
+#panel.room .room-feed { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: .5em; font-size: .8em; }
+#panel.room .room-row { border: 1px solid var(--line); border-radius: .3em; padding: .4em .6em; background: var(--panel); }
+#panel.room .room-head { display: flex; gap: .5em; flex-wrap: wrap; align-items: baseline; font-size: .85em; }
+#panel.room .room-q { margin-top: .2em; }
+#panel.room .room-a { font-size: .85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#panel.room .room-sure.sure { color: var(--moss); } #panel.room .room-sure.unsure { color: var(--amber); } #panel.room .room-sure.flip { color: var(--red); }

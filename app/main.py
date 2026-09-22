@@ -11,7 +11,8 @@ from .jobs import RaceJob
 from .vllm import VLLM
 from .tools import Tools
 from .chunks import Chunker
-from .turnlog import TurnLog
+from .turnlog import TurnLog, hesitations
+from collections import deque
 from .ears import Ears, split_wake, spoken_command
 from . import grader
 import difflib, re, os, base64, logging, time
@@ -62,6 +63,7 @@ class TurnReq(BaseModel):
     session_id: str
     text: str | None = None
     source: str | None = None    # "typed" (default) or "voice" — only for the turn log
+    name: str | None = None      # NFCU: optional first name for the presenter's room feed (and the turn log)
 
 
 class SessReq(BaseModel):
@@ -85,6 +87,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     tools = tools or Tools()
     chunker = chunker or Chunker(cfg.tokenizer_repo)
     turnlog = TurnLog(cfg.turnlog)
+    room: deque = deque(maxlen=60)     # the presenter's live feed: the last turns from every session, newest last
     scr = script_mod.load()
     app = FastAPI(title="ctxdemo")
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
@@ -122,6 +125,18 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
                 "ears": ("ok" if ears.health() else "down") if ears else "none", "listen_seconds": cfg.listen_seconds,
                 "compact_at": cfg.compact_at, "handoff_turn": cfg.handoff_turn, "script_turns": len(scr.turns),
                 "prices": cfg.prices, "chunks": bool(getattr(chunker, "available", False))}
+
+    @app.get("/api/queue")
+    def queue():
+        """How busy the shared GPU is right now, for the ask box's waiting line."""
+        return {"queue": vllm.queue() if hasattr(vllm, "queue") else None}
+
+    @app.get("/api/room")
+    def room_feed(request: Request):
+        """The room: recent questions from every session, newest first. Presenter-only when the audience clamp is on."""
+        if is_audience(request):
+            raise HTTPException(403, "presenter only")
+        return {"turns": list(reversed(room))}
 
     @app.get("/api/personas")
     def list_personas():
@@ -176,9 +191,18 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         except Exception as e:
             raise HTTPException(502, f"model server error: {type(e).__name__}: {e}")
         d = tr.to_dict()
+        name = (req.name or "").strip()[:24] or getattr(s, "room_name", None)   # a name given once sticks to the session
+        s.room_name = name
+        if tr.answer is not None:
+            room.append({"ts": time.strftime("%H:%M:%S"), "name": name, "user": text, "answer": (tr.answer or "")[:160],
+                         "seconds": tr.seconds, "persona": s.persona, "session": s.id[:6],
+                         **{k: v for k, v in hesitations(tr.tokens).items() if k in ("pieces", "flips")},
+                         "sure_pct": (round(100 * sum(1 for t in tr.tokens if t.get("t", "").strip() and t.get("p", 1) >= 0.9)
+                                            / max(1, sum(1 for t in tr.tokens if t.get("t", "").strip()))) if tr.tokens else None),
+                         "worst": next(iter(hesitations(tr.tokens)["worst"]), None) if tr.tokens else None})
         d["asks"] = asks
         d["remembered"] = {a: grader.remembered(tr.answer, scr.details[a]) for a in asks}
-        turnlog.write(s.id, tab_of(s), text, tr.answer, tr.seconds, tr.tokens, source=req.source or "typed", persona=s.persona,
+        turnlog.write(s.id, tab_of(s), text, tr.answer, tr.seconds, tr.tokens, source=req.source or "typed", persona=s.persona, name=name,
                       full={"n": tr.n, "system": s.system, "user_chunks": tr.user_chunks, "pieces": tr.tokens, "cut": tr.cut,
                             "sent_tokens": tr.sent_tokens, "new_tokens": tr.new_tokens, "breakdown": tr.breakdown,
                             "event": tr.event, "event_text": tr.event_text, "tool_uses": tr.tool_uses, "wire": tr.wire,
