@@ -483,11 +483,11 @@
       const r = await api('session', { mode: $('board-mode').value, tools: $('board-tools').checked, board: true, teach, window: win });
       sid = r.session_id; packAll(null, r.state); ctxMap.seed(r.state.graph); $('ask-strip').classList.remove('quiet');
     }
-    async function turn(text) {
+    async function turn(text, source) {
       if (busy) return; busy = true; cam.classList.add('thinking');
       try {
         if (!sid) await start();
-        const r = await api('turn', { session_id: sid, text });
+        const r = await api('turn', { session_id: sid, text, ...(source ? { source } : {}) });
         if (r.turn.event === 'compacted') showCompaction(r.turn.event_text, (r.turn.graph_delta || {}).survive, lastFull);   // before packAll: the wall gets was → now
         renderTurn(chat, r.turn); packAll(r.turn, r.state); ctxMap.applyDelta(r.turn.graph_delta);
         $('ask-strip').classList.toggle('quiet', (r.state.graph.nodes || []).length >= 6);
@@ -572,7 +572,7 @@
         readTxt(r.read === 'NONE' ? '(nothing readable)' : r.read);
         $('read-cost').textContent = `reading the board: ${fmt(r.read_tokens)} tokens · ${r.seconds} s · ${fmt(readTotal)} so far`;
         cam.classList.toggle('new', !!r.new);
-        if (r.new && r.question) { note('', `Read off the board: “${r.question}”`); await turn(r.question); }
+        if (r.new && r.question) { note('', `Read off the board: “${r.question}”`); await turn(r.question, 'board'); }
         else if (r.command === 'COMPACT') await compactNow();
         else if (r.command === 'HANDOFF') await handoff();
         else if (r.command === 'RESET') await start();
@@ -640,7 +640,7 @@
           if (r.command === 'COMPACT') await compactNow(); else if (r.command === 'HANDOFF') await handoff(); else await start();
           micState(`listening… ${r.listen_left} s`);
         }
-        else if (r.question) { micState(`heard: “${r.heard}”`); note('', `Heard: “${r.heard}”`); await turn(r.question); micState(`listening… ${r.listen_left} s`); }
+        else if (r.question) { micState(`heard: “${r.heard}”`); note('', `Heard: “${r.heard}”`); await turn(r.question, 'voice'); micState(`listening… ${r.listen_left} s`); }
         else if (r.listening) micState(r.woke ? 'listening… ask your question' : `listening… ${r.listen_left} s · heard “${r.heard}”`);
         else micState(r.heard ? `(ignored: “${r.heard.slice(0, 40)}”) — say “hi compact demo”` : 'say “hi compact demo”');
       } catch (e) { micState('speech: ' + e.message); }

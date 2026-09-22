@@ -10,6 +10,7 @@ from .jobs import RaceJob
 from .vllm import VLLM
 from .tools import Tools
 from .chunks import Chunker
+from .turnlog import TurnLog
 from .ears import Ears, split_wake, spoken_command
 from . import grader
 import difflib, re, os, base64, logging, time
@@ -56,6 +57,7 @@ class LookReq(BaseModel):
 class TurnReq(BaseModel):
     session_id: str
     text: str | None = None
+    source: str | None = None    # "typed" (default) or "voice" — only for the turn log
 
 
 class SessReq(BaseModel):
@@ -77,12 +79,18 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
             else VLLM(cfg.vision_url or cfg.vllm_url, cfg.vision_model or cfg.model)
     tools = tools or Tools()
     chunker = chunker or Chunker(cfg.tokenizer_repo)
+    turnlog = TurnLog(cfg.turnlog)
     scr = script_mod.load()
     app = FastAPI(title="ctxdemo")
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
     sessions: dict[str, Session] = {}
     jobs: dict[str, RaceJob] = {}
     app.state.sessions, app.state.jobs = sessions, jobs
+
+    def tab_of(s: Session) -> str:
+        """Which tab a session belongs to, for the turn log: map / board / compact / endless / race, +peek for act 6."""
+        base = "map" if s.system == SYSTEM_MAP else "board" if s.system == SYSTEM_BOARD else s.mode
+        return base + ("+peek" if s.peek else "")
 
     def get(sid: str) -> Session:
         s = sessions.get(sid)
@@ -136,6 +144,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         d = tr.to_dict()
         d["asks"] = asks
         d["remembered"] = {a: grader.remembered(tr.answer, scr.details[a]) for a in asks}
+        turnlog.write(s.id, tab_of(s), text, tr.answer, tr.seconds, tr.tokens, source=req.source or "typed")
         return {"turn": d, "state": s.state()}
 
     @app.post("/api/handoff")
@@ -175,7 +184,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
             raise HTTPException(502, f"speech server error: {type(e).__name__}: {e}")
         heard = re.sub(r"\[[A-Z_ ]+\]|\([a-z ]+\)", " ", r.text).strip()   # whisper markers: [BLANK_AUDIO], (laughs)
         heard = re.sub(r"\s+", " ", heard)
-        log.info("hear: %r (%.1fs)", heard[:120], r.seconds)
+        if turnlog.enabled:                                   # bystander speech stays out of the logs unless we are logging turns
+            log.info("hear: %r (%.1fs)", heard[:120], r.seconds)
         now = time.time()
         out = {"heard": heard, "seconds": round(r.seconds, 2), "woke": False, "question": None, "command": None,
                "listening": now < s.listening_until, "listen_left": max(0, round(s.listening_until - now))}
