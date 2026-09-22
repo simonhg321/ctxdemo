@@ -1,6 +1,6 @@
 // The driver: the only panel that talks to the server. Everything else listens on the bus.
 peekPanels.driver = (function () {
-  let el, sid = null, busy = false, lastTurn = null, lastSelect = null, persona = null;
+  let el, sid = null, busy = false, lastTurn = null, lastSelect = null, persona = null, web = false;   // web: give the session the web_search tool (tab 4's)
   const API = '../../api/';                                  // relative: the app lives under /demo/ behind Caddy
   const ASKS = ['Pick a number between 1 and 10', 'Divide by 3 in C using only shifts', 'Name a colour, then a fruit, then a city', 'Finish this: roses are red, violets are…'];
   async function post(path, body) {
@@ -12,10 +12,11 @@ peekPanels.driver = (function () {
     text = (text || '').trim(); if (!text || busy) return;
     busy = true; status('thinking…'); el.querySelectorAll('button,input').forEach(b => b.disabled = true);
     try {
-      if (!sid) sid = (await post('session', Object.assign({ mode: 'compact', board: true, peek: true }, peekLib.personaSessionFields(persona)))).session_id;
+      if (!sid) sid = (await post('session', Object.assign({ mode: 'compact', board: true, peek: true, tools: web }, peekLib.personaSessionFields(persona)))).session_id;
       const r = await post('turn', { session_id: sid, text });
       sendTurn(r);
-      status(r.turn.event === 'compacted' ? 'the backpack was full — it compacted first' : '');
+      const searched = (r.turn.tool_uses || []).map(u => (u.args || {}).query || u.name).join(' · ');
+      status(r.turn.event === 'compacted' ? 'the backpack was full — it compacted first' : searched ? 'searched the web: ' + searched : '');
       el.querySelector('#q').value = '';
     } catch (e) { status('error: ' + e.message); if (/no such session/.test(e.message)) sid = null; }   // show the real error; a restart forgets sessions
     busy = false; el.querySelectorAll('button,input').forEach(b => b.disabled = false); el.querySelector('#q').focus();
@@ -29,10 +30,14 @@ peekPanels.driver = (function () {
     mount(root) {
       el = root;
       el.innerHTML = '<div class="cap">ask the model</div><form id="f" style="display:flex;gap:.5em"><input type="text" id="q" placeholder="type a question" autocomplete="off"><button>Ask</button></form>' +
-        '<div id="asks" style="display:flex;flex-wrap:wrap;gap:.4em"></div><div style="display:flex;gap:.6em;align-items:center"><button id="new" type="button">Start over</button><span id="st" class="dim"></span></div>';
+        '<div id="asks" style="display:flex;flex-wrap:wrap;gap:.4em"></div><div style="display:flex;gap:.6em;align-items:center"><button id="new" type="button">Start over</button><button id="web" type="button" title="give it web search (a fresh session)">🌐 web: off</button><span id="st" class="dim"></span></div>';
       ASKS.forEach(a => { const b = document.createElement('button'); b.type = 'button'; b.textContent = a; b.onclick = () => ask(a); el.querySelector('#asks').appendChild(b); });
       el.querySelector('#f').onsubmit = e => { e.preventDefault(); ask(el.querySelector('#q').value); };
       el.querySelector('#new').onclick = () => { sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {}); status(''); };
+      el.querySelector('#web').onclick = () => {                 // toggling means a fresh session: tools are fixed at session start
+        web = !web; sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {});
+        el.querySelector('#web').textContent = '🌐 web: ' + (web ? 'on' : 'off'); status(web ? 'it can search the web now' : '');
+      };
       peekBus.on('select', d => { if (lastTurn) lastSelect = d; });
       peekBus.on('persona', d => {                              // a persona button was picked: speak as it, starting fresh
         if (persona && persona.id === d.id && persona.title === d.title && persona.prompt === d.prompt) return;   // our own hello re-send: not a real change
