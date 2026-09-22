@@ -7,6 +7,9 @@ demo.instockornot.club {
 	redir / /static/peek/wall.html 302
 	reverse_proxy ctxdemo:8200
 	log {
-		output file /data/access.log { roll_size 20mb roll_keep 3 }
+		output file /data/access.log {
+			roll_size 20mb
+			roll_keep 3
+		}
 	}
 }
