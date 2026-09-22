@@ -114,3 +114,10 @@ def test_chat_sets_cut_on_finish_reason_length():
         return httpx.Response(200, json={"choices": [{"message": {"content": "abc"}, "finish_reason": "length"}], "usage": {}})
     v = VLLM("http://x", "m", transport=httpx.MockTransport(handler))
     assert v.chat([{"role": "user", "content": "hi"}], 5).cut is True
+
+
+def test_count_messages_empty_never_calls_server():
+    def handler(request):
+        raise AssertionError("should not be called")
+    v = VLLM("http://x", "m", transport=httpx.MockTransport(handler))
+    assert v.count_messages([]) == 0

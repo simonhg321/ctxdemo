@@ -130,6 +130,8 @@ class VLLM:
         return estimate(text) if n is None else n
 
     def count_messages(self, messages: list[dict]) -> int:
+        if not messages:
+            return 0                               # a "no instructions" session before its first turn: vLLM 400s on an empty chat
         n = self._tok({"model": self.model, "messages": messages, "add_generation_prompt": True,
                        "chat_template_kwargs": {"enable_thinking": False}})
         if n is not None:
