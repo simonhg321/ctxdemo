@@ -13,7 +13,7 @@ demo.instockornot.club {
 		basic_auth {
 			import /etc/caddy/htpasswd-presenter
 		}
-		redir / /static/peek/wall.html 302
+		redir / /presenter/static/peek/wall.html 302
 		reverse_proxy ctxdemo:8200 {
 			header_up X-Presenter 1
 		}
