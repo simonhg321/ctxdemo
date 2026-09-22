@@ -1,7 +1,6 @@
 import pytest
 from dataclasses import replace
 from app.session import Session
-from app.chunks import Chunker
 
 
 def words(n): return " ".join(["w"] * n)

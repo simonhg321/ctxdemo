@@ -3,7 +3,7 @@
 # listen on the docker bridge — see port-to-box.sh). Ears: whisper.cpp in the container below, CPU, small.en.
 services:
   ctxdemo:
-    build: .
+    build: { context: ., args: { CTXDEMO_TOKENIZER: Qwen/Qwen3-8B } }
     container_name: ctxdemo
     restart: unless-stopped
     ports:
@@ -15,7 +15,6 @@ services:
       - VISION_URL=http://host.docker.internal:11434
       - VISION_MODEL=qwen2.5vl:7b
       - EARS_URL=http://whisper:8300
-      - CTXDEMO_TOKENIZER=Qwen/Qwen3-8B
       - HF_HUB_OFFLINE=1
     volumes:
       - ./data:/srv/data

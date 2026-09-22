@@ -54,7 +54,7 @@ Everything is a **panel**: a tiny page that draws one thing and knows nothing ab
 ### 3.3 Panels in this round
 | `show=` | Draws |
 |---|---|
-| `driver` | Input box + four "try asking" buttons chosen to make the model hesitate ("Pick a number between 1 and 10", "What's the capital of Australia?", "Finish this: roses are red, violets are…", "Write one line about fog"). Owns the session (`{peek: true, board: true}`, typed input only), calls `/api/turn`, sends `turn`. The only panel that talks to the server. |
+| `driver` | Input box + four "try asking" buttons chosen to make the model hesitate ("Pick a number between 1 and 10", "Write one line about fog", "Name a colour, then a fruit, then a city", "Finish this: roses are red, violets are…"). Owns the session (`{peek: true, board: true}`, typed input only), calls `/api/turn`, sends `turn`. The only panel that talks to the server. (List revised 2026-09-21 after capture: "What's the capital of Australia?" produced no hesitation at all.) |
 | `chunks` | The student's sentence as alternating-tint blocks + "9 pieces". |
 | `answer` | The answer revealed piece by piece, paced from the turn's real seconds ÷ piece count (capped at 8 s). Colour by `p`: ≥0.9 green, 0.5–0.9 amber, <0.5 red (existing colour tokens). Tap a piece → sends `select`. After the reveal, rings the 3 lowest-`p` pieces (ignoring whitespace-only ones) and cycles `select` through them every 4 s until someone taps. |
 | `almost` | "What it almost said": bar chart of the top 5 guesses for the piece in focus. |

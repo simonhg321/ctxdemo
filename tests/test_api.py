@@ -249,4 +249,7 @@ def test_act6_pages_are_served(client):
     for f in ("panel.html", "wall.html", "bus.js", "lib.js", "peek.css", "replay.json",
               "driver.js", "chunks.js", "answer.js", "almost.js", "tiles.js"):
         assert client.get(f"/static/peek/{f}").status_code == 200, f
-    assert 'src="/' not in client.get("/static/peek/wall.html").text      # relative URLs only: we live under /demo/
+    for f in ("wall.html", "panel.html", "driver.js"):
+        body = client.get(f"/static/peek/{f}").text
+        assert 'src="/' not in body and "fetch('/" not in body and "'/api" not in body, f
+    assert "panel.html?show=" in client.get("/static/peek/wall.html").text

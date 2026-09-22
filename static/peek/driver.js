@@ -2,7 +2,7 @@
 peekPanels.driver = (function () {
   let el, sid = null, busy = false, lastTurn = null, lastSelect = null;
   const API = '../../api/';                                  // relative: the app lives under /demo/ behind Caddy
-  const ASKS = ['Pick a number between 1 and 10', "What's the capital of Australia?", 'Finish this: roses are red, violets are…', 'Write one line about fog'];
+  const ASKS = ['Pick a number between 1 and 10', 'Write one line about fog', 'Name a colour, then a fruit, then a city', 'Finish this: roses are red, violets are…'];
   async function post(path, body) {
     const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
@@ -21,7 +21,10 @@ peekPanels.driver = (function () {
     busy = false; el.querySelectorAll('button,input').forEach(b => b.disabled = false); el.querySelector('#q').focus();
   }
   function status(s) { el.querySelector('#st').textContent = s; }
-  function sendTurn(msg) { lastTurn = msg; lastSelect = null; peekBus.send('turn', msg); }
+  function sendTurn(msg) {
+    const slim = { turn: msg.turn, state: msg.state ? { window_tokens: msg.state.window_tokens, next_would_send: msg.state.next_would_send } : null };
+    lastTurn = slim; lastSelect = null; peekBus.send('turn', slim);
+  }
   return {
     mount(root) {
       el = root;
