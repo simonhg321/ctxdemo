@@ -149,6 +149,22 @@ def test_graph_fields_on_routes(fake, cfg):
     assert h["graph_survive"] == {"kept": [], "absorbed": [["alpha", None]]} and h["graph_seed"]["nodes"] == []
 
 
+def test_session_persona_sends_its_prompt_as_system(fake, cfg):
+    from app.personas import Persona
+    app = create_app(vllm=fake, cfg=cfg, personas={"pirate": Persona("pirate", "Pirate", "b", "Arr, be a pirate.")})
+    c = TestClient(app)
+    sid = c.post("/api/session", json={"mode": "endless", "persona": "pirate"}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    assert fake.calls[-1]["messages"][0] == {"role": "system", "content": "Arr, be a pirate."}
+    assert app.state.sessions[sid].persona == "pirate"
+
+
+def test_session_unknown_persona_is_400(fake, cfg):
+    app = create_app(vllm=fake, cfg=cfg, personas={})
+    c = TestClient(app)
+    assert c.post("/api/session", json={"mode": "endless", "persona": "nope"}).status_code == 400
+
+
 def test_static_is_served(client):
     assert client.get("/static/replay.json").status_code in (200, 404)      # the mount exists (404 until the file lands)
     assert client.get("/static/../app/main.py").status_code in (403, 404)

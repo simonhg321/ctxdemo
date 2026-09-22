@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from . import config, script as script_mod
 from .session import Session, SYSTEM, SYSTEM_BOARD, SYSTEM_MAP
+from .personas import load as load_personas
 from .jobs import RaceJob
 from .vllm import VLLM
 from .tools import Tools
@@ -41,6 +42,8 @@ class NewSession(BaseModel):
     teach: bool = False          # the map: longer lab-guide answers that invite the next question
     window: int | None = None    # board sessions only: a smaller backpack for the wall, so a short chat visibly fills it
     peek: bool = False           # act 6: return the guesses behind each piece of the answer
+    persona: str | None = None   # act 6: config/personas/<id>.md — the system prompt speaks as this persona
+    system: str | None = None    # act 6: free-text system prompt; wins over persona ("" = no system message at all)
 
 
 class HearReq(BaseModel):
@@ -69,8 +72,9 @@ class ListenReq(BaseModel):
     off: bool = False            # the off button: close the window now
 
 
-def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=None) -> FastAPI:
+def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=None, personas=None) -> FastAPI:
     cfg = cfg or config.load()
+    personas = personas if personas is not None else load_personas()
     if ears is None and cfg.ears_url:
         ears = Ears(cfg.ears_url)
     vllm = vllm or VLLM(cfg.vllm_url, cfg.model)
@@ -111,6 +115,11 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
                 "compact_at": cfg.compact_at, "handoff_turn": cfg.handoff_turn, "script_turns": len(scr.turns),
                 "prices": cfg.prices, "chunks": bool(getattr(chunker, "available", False))}
 
+    @app.get("/api/personas")
+    def list_personas():
+        return {"personas": [{"id": p.id, "title": p.title, "blurb": p.blurb, "prompt": p.prompt}
+                              for p in personas.values()]}
+
     @app.get("/api/script")
     def get_script():
         return {"turns": [t.__dict__ for t in scr.turns], "details": {k: v.__dict__ for k, v in scr.details.items()}}
@@ -120,8 +129,18 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         if req.mode not in ("endless", "compact", "handoff"):
             raise HTTPException(400, "mode must be endless|compact|handoff")
         board_window = max(1024, min(8192, req.window)) if req.window else cfg.board_window
+        if req.system is not None:                       # custom free text always wins, even "" (no system message)
+            system_prompt, persona_label = req.system, "custom"
+        elif req.persona is not None:
+            p = personas.get(req.persona)
+            if not p:
+                raise HTTPException(400, "unknown persona")
+            system_prompt, persona_label = p.prompt, req.persona
+        else:
+            system_prompt = SYSTEM_MAP if req.teach else SYSTEM_BOARD if req.board else SYSTEM
+            persona_label = None
         s = Session(req.mode, vllm, replace(cfg, window_tokens=board_window) if req.board else cfg,
-                    system_prompt=SYSTEM_MAP if req.teach else SYSTEM_BOARD if req.board else SYSTEM,
+                    system_prompt=system_prompt, persona=persona_label,
                     tools=tools if req.tools else None, peek=req.peek, chunker=chunker)
         sessions[s.id] = s
         return {"session_id": s.id, "state": s.state()}
@@ -144,7 +163,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         d = tr.to_dict()
         d["asks"] = asks
         d["remembered"] = {a: grader.remembered(tr.answer, scr.details[a]) for a in asks}
-        turnlog.write(s.id, tab_of(s), text, tr.answer, tr.seconds, tr.tokens, source=req.source or "typed")
+        turnlog.write(s.id, tab_of(s), text, tr.answer, tr.seconds, tr.tokens, source=req.source or "typed", persona=s.persona)
         return {"turn": d, "state": s.state()}
 
     @app.post("/api/handoff")

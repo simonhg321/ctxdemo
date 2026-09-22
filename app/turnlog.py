@@ -28,13 +28,15 @@ class TurnLog:
         self.enabled = self.path is not None
 
     def write(self, session_id: str, tab: str, user: str, answer: str | None, seconds: float,
-              tokens: list[dict] | None = None, source: str = "typed") -> None:
+              tokens: list[dict] | None = None, source: str = "typed", persona: str | None = None) -> None:
         if not self.enabled:
             return
         rec = {"ts": time.strftime("%Y-%m-%d %H:%M:%S"), "session": session_id, "tab": tab, "source": source,
                "user": user, "answer": answer, "seconds": round(seconds, 2)}
         if tokens:
             rec["guesses"] = hesitations(tokens)
+        if persona is not None:
+            rec["persona"] = persona
         try:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as f:

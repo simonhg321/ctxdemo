@@ -37,6 +37,26 @@ def test_turn_appends_one_line_when_enabled(fake, cfg, tmp_path):
     assert rec["guesses"]["pieces"] == 2
 
 
+def test_turn_log_line_carries_persona(fake, cfg, tmp_path):
+    from app.personas import Persona
+    path = tmp_path / "turns.jsonl"
+    app = create_app(vllm=fake, cfg=replace(cfg, turnlog=str(path)), personas={"pirate": Persona("pirate", "Pirate", "b", "Arr.")})
+    c = TestClient(app)
+    sid = c.post("/api/session", json={"mode": "endless", "persona": "pirate"}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    rec = json.loads(path.read_text().splitlines()[0])
+    assert rec["persona"] == "pirate"
+
+
+def test_turn_log_line_omits_persona_when_none(fake, cfg, tmp_path):
+    path = tmp_path / "turns.jsonl"
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, turnlog=str(path))))
+    sid = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    rec = json.loads(path.read_text().splitlines()[0])
+    assert "persona" not in rec
+
+
 def test_turn_writes_nothing_by_default(fake, cfg, tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     c = TestClient(create_app(vllm=fake, cfg=cfg))
