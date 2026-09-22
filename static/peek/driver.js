@@ -35,7 +35,7 @@ peekPanels.driver = (function () {
     mount(root) {
       el = root;
       el.innerHTML = '<div class="cap">ask the model</div><form id="f" style="display:flex;gap:.5em"><input type="text" id="q" placeholder="type a question" autocomplete="off"><button>Ask</button></form>' +
-        '<div id="asks" style="display:flex;flex-wrap:wrap;gap:.4em"></div><div style="display:flex;gap:.6em;align-items:center"><button id="new" type="button">Start over</button><button id="web" type="button" title="give it web search (a fresh session)">🌐 web: off</button><button id="win" type="button" title="backpack size (a fresh session)">🎒 4k</button><button id="cmp" type="button" title="compact at 95% full, or let it overflow (a fresh session)">compact: on</button><span id="st" class="dim"></span></div>';
+        '<div id="asks" style="display:flex;flex-wrap:wrap;gap:.35em;font-size:.85em"></div><div style="display:flex;gap:.6em;align-items:center"><button id="new" type="button">Start over</button><button id="web" type="button" title="give it web search (a fresh session)">🌐 web: off</button><button id="win" type="button" title="backpack size (a fresh session)">🎒 4k</button><button id="cmp" type="button" title="compact at 95% full, or let it overflow (a fresh session)">compact: on</button><span id="st" class="dim"></span></div>';
       ASKS.forEach(a => { const b = document.createElement('button'); b.type = 'button'; b.textContent = a; b.onclick = () => ask(a); el.querySelector('#asks').appendChild(b); });
       el.querySelector('#f').onsubmit = e => { e.preventDefault(); ask(el.querySelector('#q').value); };
       el.querySelector('#new').onclick = () => { sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {}); status(''); };
