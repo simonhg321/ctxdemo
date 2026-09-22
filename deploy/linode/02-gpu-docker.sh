@@ -18,7 +18,7 @@ if [ ! -f /usr/share/keyrings/cuda-archive-keyring.gpg ]; then
   dpkg -i /tmp/cuda-keyring.deb >/dev/null && rm -f /tmp/cuda-keyring.deb
   apt-get update -qq
 fi
-if ! dpkg -l nvidia-open 2>/dev/null | grep -q '^ii'; then
+if [ "$(dpkg-query -W -f='${Status}' nvidia-open 2>/dev/null)" != "install ok installed" ]; then
   echo "== installing nvidia-open (takes a few minutes: builds the kernel module)"
   apt-get install -y -qq nvidia-open >/dev/null
 fi
@@ -39,7 +39,7 @@ echo "== docker $(docker --version | awk '{print $3}') compose $(docker compose 
 
 # 3. NVIDIA container toolkit -> docker runtime.
 if ! command -v nvidia-ctk >/dev/null; then
-  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+  curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | gpg --batch --yes --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
   curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
     | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
     > /etc/apt/sources.list.d/nvidia-container-toolkit.list
