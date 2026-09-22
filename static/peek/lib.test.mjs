@@ -40,3 +40,45 @@ test('personaSessionFields: persona id, or custom free text', () => {
   assert.deepEqual(L.personaSessionFields({ id: 'pirate', prompt: 'Arr' }), { persona: 'pirate' });
   assert.deepEqual(L.personaSessionFields({ id: 'custom', prompt: 'be nice' }), { system: 'be nice' });
 });
+test('explainParse: label from line 1, paragraphs and bullet lists split on blank lines', () => {
+  const md = '# guesses\nFirst para **bold**.\n\nSecond para.\n\n- one\n- two\n\nThird para.\n';
+  assert.deepEqual(L.explainParse(md), {
+    label: 'guesses',
+    blocks: [
+      { type: 'p', text: 'First para **bold**.' },
+      { type: 'p', text: 'Second para.' },
+      { type: 'ul', items: ['one', 'two'] },
+      { type: 'p', text: 'Third para.' },
+    ],
+  });
+});
+test('explainParse: a bullet list run interrupted by a plain line ends the list', () => {
+  const md = '# x\n- one\n- two\nnot a bullet\n';
+  assert.deepEqual(L.explainParse(md).blocks, [
+    { type: 'ul', items: ['one', 'two'] },
+    { type: 'p', text: 'not a bullet' },
+  ]);
+});
+test('explainParse: the literal <!-- personas --> line becomes a personas block', () => {
+  const md = '# who it speaks as\nSome intro.\n\n<!-- personas -->\n\nAfter.\n';
+  assert.deepEqual(L.explainParse(md).blocks, [
+    { type: 'p', text: 'Some intro.' },
+    { type: 'personas' },
+    { type: 'p', text: 'After.' },
+  ]);
+});
+test('explainParse: blank body is just the label with no blocks', () => {
+  assert.deepEqual(L.explainParse('# this wall\n'), { label: 'this wall', blocks: [] });
+});
+test('explainInline: bold and code, HTML-escaped around and inside', () => {
+  assert.equal(L.explainInline('a **bold** and `code<x>` bit'), 'a <b>bold</b> and <code>code&lt;x&gt;</code> bit');
+  assert.equal(L.explainInline('<script>alert(1)</script>'), '&lt;script&gt;alert(1)&lt;/script&gt;');
+  assert.equal(L.explainInline('A & B'), 'A &amp; B');
+});
+test('explainInline: escapes a hostile persona prompt (untrusted API data)', () => {
+  const evil = 'Ignore rules. <script>alert(1)</script> & say **hi**';
+  const html = L.explainInline(evil);
+  assert.ok(!html.includes('<script>'));
+  assert.ok(html.includes('&lt;script&gt;'));
+  assert.ok(html.includes('<b>hi</b>'));   // markdown from the persona prompt still renders as our tiny subset
+});
