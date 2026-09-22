@@ -1,18 +1,23 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><title>ctxdemo · the guesses</title>
-<style>html,body{height:100%;margin:0;background:#0f1216;overflow:hidden} iframe{position:absolute;border:0;border-radius:6px;outline:1px solid #262d36}</style></head>
-<body><script>
+<link rel="stylesheet" href="peek.css">
+<style>html,body{height:100%;margin:0;background:#0f1216;overflow:hidden}
+#wall-frames{position:absolute;left:0;right:0;top:0;bottom:0}
+body.explain-bar-active #wall-frames{top:var(--explain-bar-h)}   /* only shifts down when explain.js actually mounted the bar */
+iframe{position:absolute;border:0;border-radius:6px;outline:1px solid #262d36}</style></head>
+<body><script src="lib.js"></script><script src="bus.js"></script><script>
   // The frozen wall: positions in % of the screen.  wall.html?layout={"answer":[2,30,60,45],...}&room=wall&replay=1
   const q = new URLSearchParams(location.search), room = q.get('room') || 'wall';
   // Six boxes: ask + chunks + answer down the left, who-it-speaks-as and what-it-almost-said down the right, the numbers along the bottom.
   const DEFAULT = { driver: [2, 3, 60, 16], chunks: [2, 21, 60, 13], answer: [2, 36, 60, 41], persona: [64, 3, 34, 46], almost: [64, 51, 34, 26], tiles: [2, 79, 96, 18] };
   function build(layout) {
-    document.body.innerHTML = '';
+    document.body.innerHTML = '<div id="wall-frames"></div>';
+    const host = document.getElementById('wall-frames');
     for (const [name, [x, y, w, h]] of Object.entries(layout)) {
       const f = document.createElement('iframe');
       f.src = `panel.html?show=${encodeURIComponent(name)}&room=${encodeURIComponent(room)}` + (name === 'driver' && q.get('replay') === '1' ? '&replay=1' : '');
       Object.assign(f.style, { left: x + '%', top: y + '%', width: w + '%', height: h + '%' });
-      document.body.appendChild(f);
+      host.appendChild(f);
     }
   }
   try {
@@ -28,4 +33,5 @@
     console.error('bad ?layout=, using the default', e);
     build(DEFAULT);
   }
+  if (q.get('bar') !== '0') { const s = document.createElement('script'); s.src = 'explain.js'; document.body.appendChild(s); }
 </script></body></html>
