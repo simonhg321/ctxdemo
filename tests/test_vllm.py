@@ -121,3 +121,27 @@ def test_count_messages_empty_never_calls_server():
         raise AssertionError("should not be called")
     v = VLLM("http://x", "m", transport=httpx.MockTransport(handler))
     assert v.count_messages([]) == 0
+
+
+def test_chat_keeps_the_wire():
+    """The wire panel shows the exact bytes: the body we posted and the JSON that came back."""
+    raw = {"choices": [{"message": {"content": "hi"}, "logprobs": {"content": [{"token": "hi", "logprob": 0.0, "top_logprobs": []}]}}],
+           "usage": {"prompt_tokens": 12, "completion_tokens": 1}}
+    v = VLLM("http://x", "m", transport=httpx.MockTransport(lambda req: httpx.Response(200, json=raw)))
+    r = v.chat([{"role": "user", "content": "hello"}], max_tokens=5, peek=True)
+    assert r.wire["request"]["messages"] == [{"role": "user", "content": "hello"}]
+    assert r.wire["request"]["logprobs"] is True and r.wire["request"]["top_logprobs"] == 5
+    assert r.wire["response"] == raw
+
+
+def test_trim_wire_keeps_the_first_pieces_and_says_how_many_there_were():
+    from app.vllm import trim_wire
+    content = [{"token": str(i), "logprob": -0.1, "top_logprobs": []} for i in range(100)]
+    wire = {"request": {"a": 1}, "response": {"choices": [{"message": {"content": "x"}, "logprobs": {"content": content}}]}}
+    t = trim_wire(wire, keep=40)
+    assert len(t["response"]["choices"][0]["logprobs"]["content"]) == 40
+    assert t["response"]["choices"][0]["logprobs"]["content"][39]["token"] == "39"
+    assert t["shown"] == 40 and t["total"] == 100 and t["request"] == {"a": 1}
+    assert len(content) == 100                                   # the original is untouched
+    assert trim_wire(None) is None
+    assert trim_wire({"request": {}, "response": {"choices": []}})["total"] == 0

@@ -6,7 +6,7 @@ import copy, logging, uuid
 from dataclasses import dataclass, field, asdict
 from typing import Literal
 from .config import Config
-from .vllm import text_of
+from .vllm import text_of, trim_wire
 from .tools import TOOLS
 from .graph import Graph, EXTRACT_PROMPT, parse_extract
 
@@ -53,6 +53,7 @@ class TurnResult:
     tokens: list[dict] = field(default_factory=list)        # act 6: {t, p, alts} per piece of the answer (peek sessions only)
     cut: bool = False                                       # the answer hit answer_max_tokens: the server stopped it, the model did not
     user_chunks: list[str] = field(default_factory=list)    # act 6: the user's sentence split into the model's pieces
+    wire: dict | None = None                                # act 6: the exact request/response of the final model call (peek sessions only, trimmed)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -207,7 +208,8 @@ class Session:
                         total_sent=self.total_sent + sent, total_new=self.total_new + new, tool_uses=uses,
                         graph_delta=delta,
                         tokens=r.tokens if self.peek else [], cut=r.cut,
-                        user_chunks=self.chunker.split(user_text) if (self.peek and self.chunker) else [])
+                        user_chunks=self.chunker.split(user_text) if (self.peek and self.chunker) else [],
+                        wire=trim_wire(r.wire) if self.peek else None)
         self.turns.append(tr)
         if event:
             self.events.append({"n": n, "event": event, "text": event_text})

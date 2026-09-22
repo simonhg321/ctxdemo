@@ -22,8 +22,16 @@ class FakeVLLM:
         if isinstance(nxt, ChatResult):
             nxt.prompt_tokens = self.count_messages(messages); return nxt
         toks = [{"t": w, "p": 0.9, "alts": [{"t": w, "p": 0.9}]} for w in nxt.split()] if peek else []
+        wire = None
+        if peek:   # the same two documents the real client keeps
+            body = {"model": self.model, "messages": [dict(m) for m in messages], "max_tokens": max_tokens, "temperature": 0,
+                    "chat_template_kwargs": {"enable_thinking": False}, "logprobs": True, "top_logprobs": 5}
+            resp = {"choices": [{"message": {"content": nxt}, "finish_reason": "stop",
+                                 "logprobs": {"content": [{"token": w, "logprob": -0.105, "top_logprobs": []} for w in nxt.split()]}}],
+                    "usage": {"prompt_tokens": self.count_messages(messages), "completion_tokens": self.count(nxt)}}
+            wire = {"request": body, "response": resp}
         return ChatResult(text=nxt, prompt_tokens=self.count_messages(messages),
-                          completion_tokens=self.count(nxt), seconds=0.01, tokens=toks)
+                          completion_tokens=self.count(nxt), seconds=0.01, tokens=toks, wire=wire)
 
     def look(self, image_b64, prompt, max_tokens=120, mime="image/jpeg"):
         text = self.looks.pop(0) if self.looks else "NONE"

@@ -82,3 +82,19 @@ test('explainInline: escapes a hostile persona prompt (untrusted API data)', () 
   assert.ok(html.includes('&lt;script&gt;'));
   assert.ok(html.includes('<b>hi</b>'));   // markdown from the persona prompt still renders as our tiny subset
 });
+test('wireDraft: the body the driver would post for this persona and question, same shape as app/vllm.py', () => {
+  assert.deepEqual(L.wireDraft('qwen3-8b', 'Be brief.', 'count to 10'), {
+    model: 'qwen3-8b',
+    messages: [{ role: 'system', content: 'Be brief.' }, { role: 'user', content: 'count to 10' }],
+    max_tokens: 10000, temperature: 0, chat_template_kwargs: { enable_thinking: false }, logprobs: true, top_logprobs: 5,
+  });
+  assert.deepEqual(L.wireDraft('m', '', 'q').messages, [{ role: 'user', content: 'q' }]);   // no instructions = no system message
+});
+test('wireHighlight: pretty JSON, HTML-escaped, the logprob keys marked', () => {
+  const html = L.wireHighlight({ logprobs: true, top_logprobs: 5, msg: '<b>&' , inner: { logprob: -0.1 } });
+  assert.ok(html.includes('<mark>"logprobs"</mark>: true'));
+  assert.ok(html.includes('<mark>"top_logprobs"</mark>: 5'));
+  assert.ok(html.includes('<mark>"logprob"</mark>: -0.1'));
+  assert.ok(html.includes('&lt;b&gt;&amp;') && !html.includes('<b>'));
+  assert.equal(L.wireHighlight(null), '');
+});

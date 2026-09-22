@@ -23,8 +23,10 @@ peekPanels.persona = (function () {
         '<button type="button" id="custom">Custom…</button>' +
         '<div id="custom-form" class="dim" style="display:none">' +
         '<textarea id="custom-text" rows="3" placeholder="system prompt"></textarea>' +
-        '<button type="button" id="use">Use it</button></div>';
+        '<button type="button" id="use">Use it</button></div>' +
+        '<button type="button" id="wire" class="linkish dim">how do we know? → show the actual request</button>';
       fetch('../../api/personas').then(r => r.json()).then(d => { personas = d.personas || []; render(); });   // relative: /demo/ prefix
+      el.querySelector('#wire').onclick = () => peekBus.send('wire', { open: true });   // wall.html hosts the wire panel as an overlay
       el.querySelector('#custom').onclick = () => {
         const f = el.querySelector('#custom-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none';
       };

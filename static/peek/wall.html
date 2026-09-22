@@ -4,7 +4,10 @@
 <style>html,body{height:100%;margin:0;background:#0f1216;overflow:hidden}
 #wall-frames{position:absolute;left:0;right:0;top:0;bottom:0}
 body.explain-bar-active #wall-frames{top:var(--explain-bar-h)}   /* only shifts down when explain.js actually mounted the bar */
-iframe{position:absolute;border:0;border-radius:6px;outline:1px solid #262d36}</style></head>
+iframe{position:absolute;border:0;border-radius:6px;outline:1px solid #262d36}
+#wire-overlay{position:fixed;inset:0;z-index:25;display:none;background:rgba(4,6,8,.78)}
+#wire-overlay.open{display:block}
+#wire-overlay iframe{left:4%;top:calc(var(--explain-bar-h) + 3vh);width:92%;height:calc(94vh - var(--explain-bar-h));outline-color:#7fc8e8}</style></head>
 <body><script src="lib.js"></script><script src="bus.js"></script><script>
   // The frozen wall: positions in % of the screen.  wall.html?layout={"answer":[2,30,60,45],...}&room=wall&replay=1
   const q = new URLSearchParams(location.search), room = q.get('room') || 'wall';
@@ -33,5 +36,14 @@ iframe{position:absolute;border:0;border-radius:6px;outline:1px solid #262d36}</
     console.error('bad ?layout=, using the default', e);
     build(DEFAULT);
   }
+  // "how do we know?" (persona panel) opens the wire panel over everything; the panel's close button / Esc / a tap on the backdrop closes it.
+  peekBus.join(room);
+  const wireHost = document.createElement('div'); wireHost.id = 'wire-overlay';
+  wireHost.addEventListener('click', () => peekBus.send('wire', { open: false }));
+  document.body.appendChild(wireHost);
+  peekBus.on('wire', d => {
+    if (d && d.open && !wireHost.firstChild) { const f = document.createElement('iframe'); f.src = `panel.html?show=wire&room=${encodeURIComponent(room)}`; wireHost.appendChild(f); }
+    wireHost.classList.toggle('open', !!(d && d.open));
+  });
   if (q.get('bar') !== '0') { const s = document.createElement('script'); s.src = 'explain.js'; document.body.appendChild(s); }
 </script></body></html>

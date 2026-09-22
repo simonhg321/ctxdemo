@@ -265,7 +265,7 @@ def test_act6_pages_are_served(client):
     html = client.get("/").text
     assert 'data-tab="guess"' in html and 'id="tab-guess"' in html
     for f in ("panel.html", "wall.html", "bus.js", "lib.js", "peek.css", "replay.json",
-              "driver.js", "chunks.js", "answer.js", "almost.js", "tiles.js", "persona.js"):
+              "driver.js", "chunks.js", "answer.js", "almost.js", "tiles.js", "persona.js", "wire.js", "explain/25-wire.md"):
         assert client.get(f"/static/peek/{f}").status_code == 200, f
     for f in ("wall.html", "panel.html", "driver.js"):
         body = client.get(f"/static/peek/{f}").text
@@ -290,3 +290,19 @@ def test_turn_reports_cut_when_server_stopped_it(fake, cfg):
     fake.responses.append(ChatResult(text="long answer that", prompt_tokens=0, completion_tokens=3, seconds=0.1, cut=True))
     assert c.post("/api/turn", json={"session_id": sid, "text": "hi"}).json()["turn"]["cut"] is True
     assert c.post("/api/turn", json={"session_id": sid, "text": "hi"}).json()["turn"]["cut"] is False
+
+
+def test_peek_turn_carries_the_wire_and_plain_turns_do_not(fake, cfg):
+    c = TestClient(create_app(vllm=fake, cfg=cfg))
+    sid = c.post("/api/session", json={"mode": "compact", "board": True, "peek": True}).json()["session_id"]
+    t = c.post("/api/turn", json={"session_id": sid, "text": "hi there"}).json()["turn"]
+    assert t["wire"]["request"]["logprobs"] is True and t["wire"]["request"]["messages"][-1]["content"] == "hi there"
+    assert "choices" in t["wire"]["response"] and t["wire"]["total"] == 3   # "Echo: hi there"
+    sid2 = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
+    assert c.post("/api/turn", json={"session_id": sid2, "text": "hi"}).json()["turn"]["wire"] is None
+
+
+def test_wire_is_indexed_in_the_explain_bar_and_linked_from_personas(client):
+    assert "25-wire.md" in client.get("/static/peek/explain.json").json()
+    assert "'wire'" in client.get("/static/peek/persona.js").text          # the "how do we know?" link sends a wire message
+    assert "show=wire" in client.get("/static/peek/wall.html").text        # the wall hosts it as an overlay

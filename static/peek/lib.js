@@ -47,6 +47,20 @@
       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
       .replace(/`(.+?)`/g, '<code>$1</code>');
   }
-  const api = { tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline };
+  // act 6, wire panel: the body the driver would post for this persona + question — the same shape app/vllm.py builds
+  // (peek session, persona leash 10,000). Shown before the first turn so the room can see the two flags without waiting.
+  function wireDraft(model, systemPrompt, userText) {
+    const messages = [];
+    if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
+    messages.push({ role: 'user', content: userText });
+    return { model, messages, max_tokens: 10000, temperature: 0, chat_template_kwargs: { enable_thinking: false }, logprobs: true, top_logprobs: 5 };
+  }
+  // Pretty JSON as safe HTML with the probability keys wrapped in <mark> — the two we ask with, the two that answer.
+  function wireHighlight(obj) {
+    if (obj == null) return '';
+    const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return esc(JSON.stringify(obj, null, 2)).replace(/"(logprobs|top_logprobs|logprob)":/g, '<mark>"$1"</mark>:');
+  }
+  const api = { tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.peekLib = api;
 })(typeof window !== 'undefined' ? window : globalThis);

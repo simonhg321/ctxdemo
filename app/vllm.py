@@ -15,6 +15,7 @@ class ChatResult:
     tool_calls: list[dict] = field(default_factory=list)   # OpenAI format: {id, type, function:{name, arguments}}
     tokens: list[dict] = field(default_factory=list)       # peek only: {t, p, alts:[{t, p}]} per generated piece
     cut: bool = False                                      # True when the server stopped it at max_tokens (finish_reason "length")
+    wire: dict | None = None                               # the exact bytes: {"request": body we posted, "response": JSON that came back}
 
 
 def text_of(content) -> str:
@@ -67,6 +68,21 @@ def parse_logprobs(choice: dict | None) -> list[dict]:
         return []
 
 
+def trim_wire(wire: dict | None, keep: int = 40) -> dict | None:
+    """The wire for the wall: keep the request whole, cut the response's per-piece list to the first `keep`
+    (a 3k-piece answer is ~300 KB of logprobs) and say how many there were. Copies; never mutates."""
+    if not wire:
+        return None
+    resp = json.loads(json.dumps(wire.get("response")))
+    total = 0
+    for ch in (resp or {}).get("choices") or []:
+        content = ((ch.get("logprobs") or {}).get("content")) or []
+        total = max(total, len(content))
+        if len(content) > keep:
+            ch["logprobs"]["content"] = content[:keep]
+    return {"request": wire.get("request"), "response": resp, "shown": min(total, keep), "total": total}
+
+
 class VLLM:
     def __init__(self, url: str, model: str, transport: httpx.BaseTransport | None = None):
         self.url = url.rstrip("/")
@@ -94,7 +110,8 @@ class VLLM:
         return ChatResult(text=(text_of(msg.get("content"))).strip(),
                           prompt_tokens=int(u.get("prompt_tokens", 0)), completion_tokens=int(u.get("completion_tokens", 0)),
                           seconds=time.time() - t0, tool_calls=list(msg.get("tool_calls") or []),
-                          tokens=parse_logprobs(choice), cut=choice.get("finish_reason") == "length")
+                          tokens=parse_logprobs(choice), cut=choice.get("finish_reason") == "length",
+                          wire={"request": body, "response": j})
 
     def chat(self, messages: list[dict], max_tokens: int, tools: list[dict] | None = None, peek: bool = False) -> ChatResult:
         body = {"model": self.model, "messages": messages, "max_tokens": max_tokens, "temperature": 0,

@@ -39,6 +39,17 @@ input[type=text] { width: 100%; }
 #panel.persona .persona-btn.active, #panel.persona #custom.active { border-color: var(--ice); box-shadow: inset 0 0 0 .07em var(--ice); }
 #panel.persona textarea { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: .25em; padding: .4em .7em; width: 100%; resize: vertical; }
 #panel.persona #custom-form { display: flex; flex-direction: column; gap: .4em; }
+#panel.persona #wire { margin-top: auto; }
+button.linkish { background: transparent; border-color: transparent; text-align: left; padding: .2em 0; font-size: .8em; }
+button.linkish:hover { color: var(--ice); border-color: transparent; }
+/* the wire panel: two JSON columns */
+#panel.wire .wire-head { display: flex; align-items: center; gap: 1em; } #panel.wire .wire-head #close { margin-left: auto; font-size: .8em; }
+#panel.wire .wire-intro { font-size: .85em; }
+#panel.wire .wire-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; flex: 1; min-height: 0; }
+#panel.wire .wire-cols > div { display: flex; flex-direction: column; min-height: 0; gap: .3em; }
+#panel.wire pre { margin: 0; flex: 1; min-height: 0; overflow: auto; font: .62em/1.4 ui-monospace, Menlo, Consolas, monospace; background: var(--panel); border: 1px solid var(--line); border-radius: .3em; padding: .8em; white-space: pre; }
+#panel.wire #note { font-size: .75em; }
+mark { background: rgba(242,169,59,.35); color: var(--bone); border-radius: .2em; padding: 0 .15em; }
 
 /* Act 6 explain bar (static/peek/explain.js, wall.html only) — reuses the tokens above, never restyles a panel. */
 #explain-bar { position: fixed; inset: 0 0 auto 0; height: var(--explain-bar-h); z-index: 20; display: flex; align-items: center; gap: .4em;
