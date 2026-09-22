@@ -2,7 +2,12 @@
 peekPanels.driver = (function () {
   let el, sid = null, busy = false, lastTurn = null, lastSelect = null, persona = null, web = false, pack = 4096, compact = true;   // web: the web_search tool; window/compact: the backpack size and whether it compacts at 95% (off = overflow on purpose)
   const API = '../../api/';                                  // relative: the app lives under /demo/ behind Caddy
-  const ASKS = ['Pick a number between 1 and 10', 'Divide by 3 in C using only shifts', 'Name a colour, then a fruit, then a city', 'Finish this: roses are red, violets are…'];
+  const ASKS = ['Pick a number between 1 and 10',                                       // short: one real coin-flip
+    'Divide by 3 in C using only shifts',                                                 // code: half the pieces uncertain
+    'Monty Hall, but the host opens a door at random and it happens to be a goat. Should I switch?',   // confidently wrong unless it shows its steps
+    'List every country in the world with its capital',                                   // long: ~2,700 pieces, stale facts (Astana)
+    'Every US president in order, with years and one thing each is remembered for',        // long: dates and hallucination bait
+    'Explain how TCP delivers a file, step by step, from SYN to the last ACK'];          // long technical, for an engineer audience
   async function post(path, body) {
     const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
