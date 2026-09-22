@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """loadtest.py — N people ask at once. Reports per-person tokens/s, wall time, and the GPU queue while it ran.
-   python3 loadtest.py https://demo.instockornot.club nfcu PASSWORD 15 [question]
+   python3 loadtest.py https://demo.instockornot.club nfcu PASSWORD 15 [question] [persona]
 Runs against the AUDIENCE door (clamped sessions, like the room will have). Needs only the standard library."""
 import base64, json, sys, threading, time, urllib.request
 
 base, user, pw, n = sys.argv[1].rstrip("/"), sys.argv[2], sys.argv[3], int(sys.argv[4])
 question = sys.argv[5] if len(sys.argv) > 5 else "Monty Hall, but the host opens a door at random and it happens to be a goat. Should I switch?"
+persona = sys.argv[6] if len(sys.argv) > 6 else "wall"          # e.g. explain = "Show your steps": long answers, hits the 600-token cap
 auth = "Basic " + base64.b64encode(f"{user}:{pw}".encode()).decode()
 
 def call(path, body=None, timeout=300):
@@ -17,7 +18,7 @@ def call(path, body=None, timeout=300):
 results, queue_samples, stop = [], [], False
 def one(i):
     try:
-        sid = call("/api/session", {"mode": "compact", "board": True, "peek": True, "persona": "wall"})["session_id"]
+        sid = call("/api/session", {"mode": "compact", "board": True, "peek": True, "persona": persona, "max_tokens": 10000})["session_id"]
         t0 = time.time(); t = call("/api/turn", {"session_id": sid, "text": question, "name": f"load{i:02d}"})["turn"]; dt = time.time() - t0
         results.append({"i": i, "tokens": len(t["tokens"]), "wall": round(dt, 1), "model_s": t["seconds"], "tps": round(len(t["tokens"]) / max(dt, .01), 1), "cut": t.get("cut")})
     except Exception as e:
