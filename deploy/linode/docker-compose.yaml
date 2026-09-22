@@ -54,10 +54,10 @@ services:
     container_name: caddy
     restart: unless-stopped
     ports: ["80:80", "443:443", "443:443/udp"]
+    command: ["caddy", "run", "--config", "/etc/caddy/conf/Caddyfile", "--adapter", "caddyfile"]
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - /srv/data/caddy/htpasswd:/etc/caddy/htpasswd:ro
-      - /srv/data/caddy/htpasswd-presenter:/etc/caddy/htpasswd-presenter:ro
+      - ./:/etc/caddy/conf:ro                          # the DIRECTORY, not the file: git pull replaces the inode and a file mount would keep the old one
+      - /srv/data/caddy:/etc/caddy/auth:ro             # htpasswd + htpasswd-presenter
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [ctxdemo]

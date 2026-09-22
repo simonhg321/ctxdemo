@@ -11,7 +11,7 @@ demo.instockornot.club {
 	}
 	handle_path /presenter/* {
 		basic_auth {
-			import /etc/caddy/htpasswd-presenter
+			import /etc/caddy/auth/htpasswd-presenter
 		}
 		redir / /presenter/static/peek/wall.html 302
 		reverse_proxy ctxdemo:8200 {
@@ -20,7 +20,7 @@ demo.instockornot.club {
 	}
 	handle {
 		basic_auth {
-			import /etc/caddy/htpasswd
+			import /etc/caddy/auth/htpasswd
 		}
 		redir / /static/peek/wall.html 302
 		reverse_proxy ctxdemo:8200 {
