@@ -26,6 +26,7 @@ class Config:
     followup_seconds: int = 12           # after an answer the mic stays open this long for a follow-up, then sleeps (25 s chained forever on room chatter)
     extract: bool = True                 # the map: one extra model call per turn to pull concepts
     extract_max_tokens: int = 200
+    tokenizer_repo: str = ""             # act 6 chunks: HF repo whose tokenizer matches the chat model; empty = strip hidden
     prices: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
@@ -36,6 +37,8 @@ def load(root: Path = ROOT) -> Config:
         demo["model"] = os.environ["VLLM_MODEL"]
     if os.environ.get("CTXDEMO_EXTRACT") == "0":
         demo["extract"] = False
+    if os.environ.get("CTXDEMO_TOKENIZER"):
+        demo["tokenizer_repo"] = os.environ["CTXDEMO_TOKENIZER"]
     url = os.environ.get("VLLM_URL", "http://127.0.0.1:8100")
     return Config(vllm_url=url, vision_url=os.environ.get("VISION_URL", url),
                   vision_model=os.environ.get("VISION_MODEL", demo["model"]), ears_url=os.environ.get("EARS_URL", ""),

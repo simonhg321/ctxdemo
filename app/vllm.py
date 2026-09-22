@@ -1,7 +1,7 @@
 """Client for an OpenAI-compatible chat server: vLLM (exact token counts via /tokenize) or Ollama (no
 /tokenize — counts before sending are estimated, counts after sending are real from `usage`)."""
 from __future__ import annotations
-import json, time
+import json, math, time
 from dataclasses import dataclass, field
 import httpx
 
@@ -13,6 +13,7 @@ class ChatResult:
     completion_tokens: int
     seconds: float
     tool_calls: list[dict] = field(default_factory=list)   # OpenAI format: {id, type, function:{name, arguments}}
+    tokens: list[dict] = field(default_factory=list)       # peek only: {t, p, alts:[{t, p}]} per generated piece
 
 
 def text_of(content) -> str:
@@ -27,6 +28,37 @@ def text_of(content) -> str:
 def estimate(text: str) -> int:
     """Rough token estimate for servers without /tokenize: ~3.6 chars per token for English."""
     return max(1, round(len(text) / 3.6)) if text else 0
+
+
+TOP_GUESSES = 5
+
+
+def _piece(it: dict) -> str:
+    """Text of one piece. Prefer the raw bytes: a piece can be half a character, and must not crash the wall."""
+    b = it.get("bytes")
+    if isinstance(b, list) and b:
+        return bytes(b).decode("utf-8", errors="replace")
+    return str(it.get("token", ""))
+
+
+def _prob(it: dict) -> float:
+    return round(math.exp(min(0.0, float(it.get("logprob", 0.0)))), 4)
+
+
+def parse_logprobs(choice: dict | None) -> list[dict]:
+    """OpenAI-format logprobs (same from Ollama and vLLM) -> [{t, p, alts}]. Never raises; anything odd -> []."""
+    try:
+        out = []
+        for it in ((choice or {}).get("logprobs") or {}).get("content") or []:
+            me = {"t": _piece(it), "p": _prob(it)}
+            alts = [{"t": _piece(a), "p": _prob(a)} for a in (it.get("top_logprobs") or [])]
+            if me not in alts:
+                alts.append(me)
+            alts.sort(key=lambda a: -a["p"])
+            out.append({**me, "alts": alts[:TOP_GUESSES]})
+        return out
+    except Exception:
+        return []
 
 
 class VLLM:
@@ -50,17 +82,21 @@ class VLLM:
         r = self._c.post("/v1/chat/completions", json=body)
         r.raise_for_status()
         j = r.json()
-        msg = j["choices"][0]["message"]
+        choice = j["choices"][0]
+        msg = choice["message"]
         u = j.get("usage") or {}
         return ChatResult(text=(text_of(msg.get("content"))).strip(),
                           prompt_tokens=int(u.get("prompt_tokens", 0)), completion_tokens=int(u.get("completion_tokens", 0)),
-                          seconds=time.time() - t0, tool_calls=list(msg.get("tool_calls") or []))
+                          seconds=time.time() - t0, tool_calls=list(msg.get("tool_calls") or []),
+                          tokens=parse_logprobs(choice))
 
-    def chat(self, messages: list[dict], max_tokens: int, tools: list[dict] | None = None) -> ChatResult:
+    def chat(self, messages: list[dict], max_tokens: int, tools: list[dict] | None = None, peek: bool = False) -> ChatResult:
         body = {"model": self.model, "messages": messages, "max_tokens": max_tokens, "temperature": 0,
                 "chat_template_kwargs": {"enable_thinking": False}}
         if tools:
             body["tools"] = tools
+        if peek:                                   # ask for the ranked guesses behind every piece (act 6)
+            body["logprobs"], body["top_logprobs"] = True, TOP_GUESSES
         return self._chat(body)
 
     def look(self, image_b64: str, prompt: str, max_tokens: int = 120, mime: str = "image/jpeg") -> ChatResult:

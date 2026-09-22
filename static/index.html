@@ -170,6 +170,7 @@
   <button role="tab" aria-selected="false" data-tab="race">3 · Handoff, side by side</button>
   <button role="tab" aria-selected="false" data-tab="board">4 · The whiteboard</button>
   <button role="tab" aria-selected="false" data-tab="map">5 · The map</button>
+  <button role="tab" aria-selected="false" data-tab="guess">6 · The guesses</button>
 </nav>
 
 <div class="banner" id="banner">The model server isn't answering. On the box: <code>cd /srv/projects/vllm && docker compose logs -f</code></div>
@@ -257,6 +258,11 @@
       <div class="controls"><button id="replay-map">Replay a canned chat</button><button id="compact-map">Compact</button><button id="handoff-map">Hand off</button></div>
     </aside>
   </div>
+</section>
+
+<section class="tab" id="tab-guess">
+  <p class="intro">The model never "knows" its answer. It reads your sentence in <b>pieces</b> and, for every piece it writes, it ranks its <b>guesses</b> and picks one. Green means it was sure; red means it was close to a coin-flip. Tap any piece to see what it almost said. <span class="dim">(Real terms: pieces are <i>tokens</i>; the ranked guesses come from the model's <i>log-probabilities</i>.)</span></p>
+  <div id="guess-frame" style="height: calc(100vh - 260px); min-height: 460px; border: 1px solid var(--line); border-radius: 6px; overflow: hidden;"></div>
 </section>
 
 <script src="static/vendor/d3.min.js"></script>
@@ -659,6 +665,14 @@
     const replaying = !!new URLSearchParams(location.search).get('replay');
     document.querySelector('nav button[data-tab=map]').addEventListener('click', () => { setTimeout(ctxMap.resize, 0); if (!replaying) camStart(); });
     if (location.hash === '#map') { document.querySelector('nav button[data-tab=map]').click(); }
+    // act 6 is just the panels arranged in one frame; built on first open so it costs nothing until used
+    document.querySelector('nav button[data-tab=guess]').addEventListener('click', () => {
+      const box = $('guess-frame'); if (box.firstChild) return;
+      const f = document.createElement('iframe');
+      f.src = 'static/peek/wall.html?room=tab-' + Math.random().toString(36).slice(2, 8) + (new URLSearchParams(location.search).get('replay') === '1' ? '&replay=1' : '');
+      f.style.cssText = 'width:100%;height:100%;border:0'; box.appendChild(f);
+    });
+    if (location.hash === '#guess') { document.querySelector('nav button[data-tab=guess]').click(); }
     $('handoff-map').addEventListener('click', handoff);
     $('compact-map').addEventListener('click', compactNow);
     // replay: a canned 12-turn chat with pre-baked graph deltas, so the map can be tuned without talking for ten minutes

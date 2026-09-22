@@ -50,6 +50,8 @@ class TurnResult:
     total_new: int
     tool_uses: list[dict] = field(default_factory=list)   # {name, args, result} per tool call this turn
     graph_delta: dict = field(default_factory=lambda: {"added": [], "bumped": [], "edges": []})   # the map
+    tokens: list[dict] = field(default_factory=list)        # act 6: {t, p, alts} per piece of the answer (peek sessions only)
+    user_chunks: list[str] = field(default_factory=list)    # act 6: the user's sentence split into the model's pieces
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -66,9 +68,11 @@ class HandoffResult:
 class Session:
     def __init__(self, mode: Mode, vllm, cfg: Config, system_prompt: str = SYSTEM,
                  memory: tuple[str, str] | None = None, carried: tuple[int, int, int] = (0, 0, 0),
-                 tools=None):
+                 tools=None, peek: bool = False, chunker=None):
         self.id = uuid.uuid4().hex[:12]
         self.tools = tools                        # a Tools instance, or None = no web access
+        self.peek = peek                          # act 6: ask for the guesses behind the answer
+        self.chunker = chunker                    # act 6: splits the user's sentence into pieces, or None
         self.mode: Mode = mode
         self.vllm = vllm
         self.cfg = cfg
@@ -120,6 +124,9 @@ class Session:
 
     def _cost(self, sent: int, new: int) -> dict[str, float]:
         return {name: round((sent * p["in"] + new * p["out"]) / 1e6, 5) for name, p in self.cfg.prices.items()}
+
+    def _peek_kw(self) -> dict:
+        return {"peek": True} if self.peek else {}      # plain sessions call chat() exactly as before
 
     # ---- compaction (compact mode only)
     def _compact(self) -> str:
@@ -173,7 +180,7 @@ class Session:
         sent = new = 0
         secs = 0.0
         uses: list[dict] = []
-        r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools)
+        r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools, **self._peek_kw())
         rounds = 0
         while r.tool_calls and self.tools and rounds < MAX_TOOL_ROUNDS:
             rounds += 1
@@ -184,7 +191,7 @@ class Session:
                 result = self.tools.run(fn.get("name", ""), fn.get("arguments", "{}"))
                 uses.append({"name": fn.get("name"), "args": fn.get("arguments"), "result": result})
                 self.transcript.append({"role": "tool", "tool_call_id": tc.get("id", f"call_{rounds}"), "content": result})
-            r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools)
+            r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools, **self._peek_kw())
         sent += r.prompt_tokens; new += r.completion_tokens; secs += r.seconds
         self.transcript.append({"role": "assistant", "content": r.text})
         delta, xp, xc, xs = self._extract(n, user_text, r.text)
@@ -196,7 +203,9 @@ class Session:
                         typed_words=typed, seconds=round(secs, 2), breakdown=breakdown,
                         event=event, event_text=event_text, cost_usd=self._cost(sent, new),
                         total_sent=self.total_sent + sent, total_new=self.total_new + new, tool_uses=uses,
-                        graph_delta=delta)
+                        graph_delta=delta,
+                        tokens=r.tokens if self.peek else [],
+                        user_chunks=self.chunker.split(user_text) if (self.peek and self.chunker) else [])
         self.turns.append(tr)
         if event:
             self.events.append({"n": n, "event": event, "text": event_text})
@@ -223,7 +232,8 @@ class Session:
         self.carried_new += r.completion_tokens
         new = Session(self.mode, self.vllm, self.cfg, self.system,
                       memory=("Handoff note from my previous session", r.text),
-                      carried=(self.n, self.total_sent, self.total_new), tools=self.tools)
+                      carried=(self.n, self.total_sent, self.total_new),
+                      tools=self.tools, peek=self.peek, chunker=self.chunker)
         new.script_pos = self.script_pos
         new.carried_typed = self.total_typed
         new.events.append({"n": self.n, "event": "handoff", "text": r.text})

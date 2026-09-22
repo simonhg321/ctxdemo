@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ctxdemo panel</title><link rel="stylesheet" href="peek.css"></head>
+<body><div id="panel"></div>
+<script src="lib.js"></script><script src="bus.js"></script>
+<script>
+  // One page, many panels:  panel.html?show=answer&room=wall   (&replay=1 plays replay.json with no model, &bg=, &scale=)
+  window.peekPanels = {};
+  const q = new URLSearchParams(location.search);
+  const show = (q.get('show') || 'answer').replace(/[^a-z]/g, ''), room = q.get('room') || 'wall';
+  const selfReplay = q.get('replay') === '1' && show !== 'driver';     // the driver replays for everyone; any other panel replays alone
+  if (q.get('bg')) document.body.style.background = q.get('bg');
+  if (q.get('scale')) document.documentElement.style.setProperty('--u', `calc(${parseFloat(q.get('scale')) || 1} * clamp(12px, calc(1.1vw + 1.1vh), 40px))`);
+  document.title = 'ctxdemo · ' + show;
+
+  let cycle = null, pending = null;
+  function stopCycle() { clearTimeout(pending); pending = null; clearInterval(cycle); cycle = null; }
+  window.peekStopCycle = stopCycle;
+  // After a turn, walk the focus through the least-sure pieces so an unattended wall still teaches.
+  function autoSelect(msg, pick) {
+    stopCycle();
+    const toks = (msg.turn && msg.turn.tokens) || [], hs = peekLib.hesitations(toks, 3);
+    if (!hs.length) return;
+    const wait = peekLib.revealDelay(msg.turn.seconds || 2, toks.length) * toks.length + 600;
+    let k = 0;
+    pending = setTimeout(() => { pending = null; pick(hs[0]); cycle = setInterval(() => pick(hs[++k % hs.length]), 4000); }, wait);
+  }
+
+  const s = document.createElement('script');
+  s.src = show + '.js';
+  s.onerror = () => { document.getElementById('panel').textContent = 'no such panel: ' + show; };
+  s.onload = async () => {
+    const p = peekPanels[show]; if (!p) return;
+    p.mount(document.getElementById('panel'));
+    if (selfReplay) {                                  // alone, no bus: for arranging the wall
+      const rp = await (await fetch('replay.json')).json(); let i = 0;
+      const play = () => { const msg = rp.turns[i++ % rp.turns.length]; p.onTurn(msg); autoSelect(msg, n => p.onSelect && p.onSelect(n)); };
+      play(); setInterval(play, 16000); return;
+    }
+    peekBus.join(room);
+    peekBus.on('turn', msg => { p.onTurn(msg); if (show === 'answer') autoSelect(msg, n => peekBus.send('select', { index: n })); });
+    peekBus.on('select', d => p.onSelect && p.onSelect(d.index));
+    peekBus.on('clear', () => { stopCycle(); p.onTurn({ turn: null, state: null }); });
+    if (show !== 'driver') peekBus.send('hello', {});   // late joiner: ask the driver to repeat the last turn
+  };
+  document.body.appendChild(s);
+</script></body></html>
