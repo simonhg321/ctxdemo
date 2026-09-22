@@ -3,7 +3,7 @@
 # They land in your running Chrome, so they share one bus: type in the driver, the rest follow.
 # Drag/size each window on the big screen; when the arrangement is right, freeze it into wall.html?layout=.
 #
-#   ./wall-open.sh                 # the five peek panels against HACLab
+#   ./wall-open.sh                 # the six peek panels against HACLab
 #   ./wall-open.sh replay          # same, canned run (no model needed)
 #   ./wall-open.sh gpu             # add the GPU dials + Netdata windows
 #   ./wall-open.sh replay gpu      # both
@@ -12,7 +12,7 @@
 
 BASE=${BASE:-https://iiat.gonzaga.edu:8443/demo}
 ROOM=${ROOM:-wall}
-PANELS="driver chunks answer almost tiles"
+PANELS="driver persona chunks answer almost tiles"
 REPLAY=; GPU=
 for a in "$@"; do case $a in replay) REPLAY=1;; gpu) GPU=1;; *) echo "unknown arg: $a"; exit 1;; esac; done
 
