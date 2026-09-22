@@ -51,4 +51,8 @@ How the model reads and chooses: the sentence in pieces (tokens), the answer col
 - Personas: `config/personas/<id>.md` (title / one-line blurb / system prompt, prompt may be empty) pick who the model
   answers as; served at `GET /api/personas`, picked from the wall with `static/peek/panel.html?show=persona&room=wall`
   (not in `wall.html`'s DEFAULT layout — add it to a custom `?layout=` to place it).
+- Explain bar: a chip strip fixed across the top of `wall.html`, one chip per `static/peek/explain/NN-<id>.md` (label =
+  line 1, body = a tiny markdown subset) listed in order by `static/peek/explain.json` — add a chip by adding a file
+  and one line there. The `who it speaks as` card's `<!-- personas -->` line renders the live persona list.
+- `wall.html?bar=0` drops the explain bar entirely (script not even loaded) so the DEFAULT iframe geometry is untouched.
 
