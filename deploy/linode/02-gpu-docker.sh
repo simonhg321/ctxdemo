@@ -18,7 +18,7 @@ if [ ! -f /usr/share/keyrings/cuda-archive-keyring.gpg ]; then
   dpkg -i /tmp/cuda-keyring.deb >/dev/null && rm -f /tmp/cuda-keyring.deb
   apt-get update -qq
 fi
-if [ "$(dpkg-query -W -f='${Status}' nvidia-open 2>/dev/null)" != "install ok installed" ]; then
+if ! dpkg-query -W -f='${Status}' nvidia-open 2>/dev/null | grep -q " installed$"; then
   echo "== installing nvidia-open (takes a few minutes: builds the kernel module)"
   apt-get install -y -qq nvidia-open >/dev/null
 fi

@@ -1,0 +1,65 @@
+# ctxdemo on the NFCU Linode (RTX 4000 Ada, 20 GB): vLLM + ctxdemo + Caddy, one compose, one private network.
+# Only Caddy publishes ports (80/443). No camera, no whisper, no vision model — the tab-6 wall on laptops.
+#   cd /srv/projects/ctxdemo/deploy/linode && docker compose up -d --build      (update: ../../deploy/linode/update.sh)
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm
+    restart: unless-stopped
+    ipc: host
+    volumes:
+      - /srv/data/hf:/root/.cache/huggingface      # model cache (Qwen3-8B-FP8 ~8.7 GB, pulled on first start)
+    environment:
+      - HF_HUB_DISABLE_TELEMETRY=1
+      - VLLM_LOGGING_LEVEL=INFO
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      Qwen/Qwen3-8B-FP8
+      --served-model-name qwen3-8b
+      --gpu-memory-utilization 0.90
+      --kv-cache-dtype fp8
+      --max-model-len 32768
+      --max-num-seqs 16
+      --enable-auto-tool-choice --tool-call-parser hermes
+      --reasoning-parser qwen3
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 80
+      start_period: 300s
+
+  ctxdemo:
+    build: { context: ../.., args: { CTXDEMO_TOKENIZER: Qwen/Qwen3-8B } }
+    container_name: ctxdemo
+    restart: unless-stopped
+    environment:
+      - VLLM_URL=http://vllm:8000
+      - HF_HUB_OFFLINE=1
+      - CTXDEMO_TURNLOG=/srv/data/logs/turns.jsonl    # on for the talk (said on the slide; first names optional)
+    volumes:
+      - /srv/data/logs:/srv/data/logs
+    depends_on:
+      vllm: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - /srv/data/caddy/htpasswd:/etc/caddy/htpasswd:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [ctxdemo]
+
+volumes:
+  caddy_data:
+  caddy_config:

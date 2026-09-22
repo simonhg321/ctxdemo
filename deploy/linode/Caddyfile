@@ -1,0 +1,12 @@
+# demo.instockornot.club — Let's Encrypt automatic. Whole site behind one shared basic-auth (the word on the slide).
+demo.instockornot.club {
+	encode zstd gzip
+	basic_auth {
+		import /etc/caddy/htpasswd
+	}
+	redir / /static/peek/wall.html 302
+	reverse_proxy ctxdemo:8200
+	log {
+		output file /data/access.log { roll_size 20mb roll_keep 3 }
+	}
+}
