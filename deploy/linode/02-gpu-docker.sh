@@ -22,8 +22,9 @@ if ! dpkg -l nvidia-open 2>/dev/null | grep -q '^ii'; then
   echo "== installing nvidia-open (takes a few minutes: builds the kernel module)"
   apt-get install -y -qq nvidia-open >/dev/null
 fi
-apt-mark hold nvidia-open 'nvidia-*' 'libnvidia-*' >/dev/null 2>&1 || true
-echo "== driver package: $(dpkg -l nvidia-open | awk '/^ii/{print $3}')  (held)"
+# Hold ONLY the installed driver packages (a glob hold also catches uninstalled names like libnvidia-container-* and blocks them).
+dpkg-query -W -f='${Package} ${Status}\n' 'nvidia-*' 'libnvidia-*' 'cuda-drivers*' 2>/dev/null | awk '/ installed$/{print $1}' | grep -v container | xargs -r apt-mark hold >/dev/null
+echo "== driver package: $(dpkg-query -W -f='${Version}' nvidia-open 2>/dev/null)  ($(apt-mark showhold | wc -l) pkgs held)"
 
 # 2. Docker from Docker's repo.
 if ! command -v docker >/dev/null; then
