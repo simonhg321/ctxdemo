@@ -129,7 +129,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     def new_session(req: NewSession = Body(...)):
         if req.mode not in ("endless", "compact", "handoff"):
             raise HTTPException(400, "mode must be endless|compact|handoff")
-        board_window = max(1024, min(8192, req.window)) if req.window else cfg.board_window
+        board_window = max(1024, min(32768, req.window)) if req.window else cfg.board_window   # 32k = the box's whole context: lets the wall overflow on purpose
         scfg = replace(cfg, window_tokens=board_window) if req.board else cfg
         if req.max_tokens:
             scfg = replace(scfg, answer_max_tokens=max(100, min(10000, req.max_tokens)))

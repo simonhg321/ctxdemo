@@ -222,6 +222,8 @@ def test_board_session_window_override_is_clamped(fake, cfg):
     win = lambda body: c.post("/api/session", json=body).json()["state"]["window_tokens"]
     assert win({"mode": "endless", "board": True, "window": 2048}) == 2048
     assert win({"mode": "endless", "board": True, "window": 50}) == 1024
+    assert win({"mode": "endless", "board": True, "window": 32768}) == 32768          # act 6: overflow on purpose
+    assert win({"mode": "endless", "board": True, "window": 99999}) == 32768
     assert win({"mode": "endless", "board": True}) == cfg.board_window
     assert win({"mode": "endless", "window": 2048}) == cfg.window_tokens                      # only the board tab
 
