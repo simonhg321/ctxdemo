@@ -4,7 +4,8 @@
 <body><script>
   // The frozen wall: positions in % of the screen.  wall.html?layout={"answer":[2,30,60,45],...}&room=wall&replay=1
   const q = new URLSearchParams(location.search), room = q.get('room') || 'wall';
-  const DEFAULT = { driver: [2, 3, 60, 24], chunks: [64, 3, 34, 24], answer: [2, 30, 60, 45], almost: [64, 30, 34, 45], tiles: [2, 78, 96, 19] };
+  // Six boxes: ask + chunks + answer down the left, who-it-speaks-as and what-it-almost-said down the right, the numbers along the bottom.
+  const DEFAULT = { driver: [2, 3, 60, 16], chunks: [2, 21, 60, 13], answer: [2, 36, 60, 41], persona: [64, 3, 34, 46], almost: [64, 51, 34, 26], tiles: [2, 79, 96, 18] };
   function build(layout) {
     document.body.innerHTML = '';
     for (const [name, [x, y, w, h]] of Object.entries(layout)) {
