@@ -2,12 +2,7 @@
 peekPanels.driver = (function () {
   let el, sid = null, busy = false, lastTurn = null, lastSelect = null, persona = null, web = false, pack = 4096, compact = true;   // web: the web_search tool; window/compact: the backpack size and whether it compacts at 95% (off = overflow on purpose)
   const API = '../../api/';                                  // relative: the app lives under /demo/ behind Caddy
-  const ASKS = ['Pick a number between 1 and 10',                                       // short: one real coin-flip
-    'Divide by 3 in C using only shifts',                                                 // code: half the pieces uncertain
-    'Monty Hall, but the host opens a door at random and it happens to be a goat. Should I switch?',   // confidently wrong unless it shows its steps
-    'List every country in the world with its capital',                                   // long: ~2,700 pieces, stale facts (Astana)
-    'Every US president in order, with years and one thing each is remembered for',        // long: dates and hallucination bait
-    'Explain how TCP delivers a file, step by step, from SYN to the last ACK'];          // long technical, for an engineer audience
+  let audience = false;                                      // Linode: the server clamps plain visitors (4k, 600 tokens, no web) and says so in /api/health
   async function post(path, body) {
     const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
@@ -36,7 +31,13 @@ peekPanels.driver = (function () {
       el = root;
       el.innerHTML = '<div class="cap">ask the model</div><form id="f" style="display:flex;gap:.5em"><input type="text" id="q" placeholder="type a question" autocomplete="off"><button>Ask</button></form>' +
         '<div id="asks" style="display:flex;flex-wrap:wrap;gap:.3em;font-size:.8em"></div><div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;font-size:.9em"><button id="new" type="button">Start over</button><button id="web" type="button" title="give it web search (a fresh session)">🌐 web: off</button><button id="win" type="button" title="backpack size (a fresh session)">🎒 4k</button><button id="cmp" type="button" title="compact at 95% full, or let it overflow (a fresh session)">compact: on</button><span id="st" class="dim"></span></div>';
-      ASKS.forEach(a => { const b = document.createElement('button'); b.type = 'button'; b.textContent = a; b.onclick = () => ask(a); el.querySelector('#asks').appendChild(b); });
+      const drawAsks = () => {
+        const box = el.querySelector('#asks'); box.innerHTML = '';
+        peekLib.asksFor(audience).forEach(a => { const b = document.createElement('button'); b.type = 'button'; b.textContent = a; b.onclick = () => ask(a); box.appendChild(b); });
+        ['#web', '#win', '#cmp'].forEach(id => { el.querySelector(id).style.display = audience ? 'none' : ''; });   // the shared GPU's knobs are the presenter's
+      };
+      drawAsks();
+      fetch(API + 'health').then(r => r.json()).then(h => { audience = !!h.audience; drawAsks(); }).catch(() => {});
       el.querySelector('#f').onsubmit = e => { e.preventDefault(); ask(el.querySelector('#q').value); };
       el.querySelector('#new').onclick = () => { sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {}); status(''); };
       const fresh = msg => { sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {}); status(msg); };   // session settings are fixed at session start

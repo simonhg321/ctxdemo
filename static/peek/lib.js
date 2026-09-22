@@ -61,6 +61,15 @@
     const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return esc(JSON.stringify(obj, null, 2)).replace(/"(logprobs|top_logprobs|logprob)":/g, '<mark>"$1"</mark>:');
   }
-  const api = { tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight };
+  // the "try asking" buttons. Long ones (~2–3k tokens) are for the presenter's wall only: on a shared GPU they jam the room.
+  const ASKS_SHORT = ['Pick a number between 1 and 10', 'Divide by 3 in C using only shifts',
+    'Monty Hall, but the host opens a door at random and it happens to be a goat. Should I switch?', 'How many r\'s are in strawberry?'];
+  const ASKS_LONG = ['List every country in the world with its capital',
+    'Every US president in order, with years and one thing each is remembered for',
+    'Explain how TCP delivers a file, step by step, from SYN to the last ACK'];
+  const asksFor = audience => (audience ? ASKS_SHORT : ASKS_SHORT.concat(ASKS_LONG));
+  // wall.html: frozen %-boxes on a big screen, a scrolling stack on a laptop; ?fit=stack|frozen forces it.
+  const wallFit = (width, fit) => (fit === 'stack' || fit === 'frozen' ? fit : width < 1900 ? 'stack' : 'frozen');
+  const api = { asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.peekLib = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -43,6 +43,7 @@ services:
       - VLLM_URL=http://vllm:8000
       - HF_HUB_OFFLINE=1
       - CTXDEMO_TURNLOG=/srv/data/logs/turns.jsonl    # on for the talk (said on the slide; first names optional)
+      - CTXDEMO_AUDIENCE=1                             # clamp sessions unless Caddy's /presenter/ route added X-Presenter
     volumes:
       - /srv/data/logs:/srv/data/logs
     depends_on:
@@ -56,6 +57,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - /srv/data/caddy/htpasswd:/etc/caddy/htpasswd:ro
+      - /srv/data/caddy/htpasswd-presenter:/etc/caddy/htpasswd-presenter:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on: [ctxdemo]

@@ -28,6 +28,7 @@ class Config:
     extract_max_tokens: int = 200
     tokenizer_repo: str = ""             # act 6 chunks: HF repo whose tokenizer matches the chat model; empty = strip hidden
     turnlog: str = ""                    # path of a JSONL file that gets every question + answer; empty = log nothing (default)
+    audience: bool = False               # NFCU Linode: clamp sessions without an X-Presenter header (4k window, 600-token leash, no tools)
     prices: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
@@ -42,6 +43,7 @@ def load(root: Path = ROOT) -> Config:
         demo["tokenizer_repo"] = os.environ["CTXDEMO_TOKENIZER"]
     if os.environ.get("CTXDEMO_TURNLOG"):
         demo["turnlog"] = os.environ["CTXDEMO_TURNLOG"]
+    demo["audience"] = os.environ.get("CTXDEMO_AUDIENCE") == "1"
     url = os.environ.get("VLLM_URL", "http://127.0.0.1:8100")
     return Config(vllm_url=url, vision_url=os.environ.get("VISION_URL", url),
                   vision_model=os.environ.get("VISION_MODEL", demo["model"]), ears_url=os.environ.get("EARS_URL", ""),

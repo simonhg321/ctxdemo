@@ -1,9 +1,11 @@
 #!/bin/bash
 # 03-stack.sh — clone the repo with the deploy key, set the shared password, bring up vLLM + ctxdemo + Caddy.
-# Run as root:  bash 03-stack.sh <user> <password>      (the pair that goes on the slide)
+# Run as root:  bash 03-stack.sh <user> <password> [<presenter-user> <presenter-password>]
+#   first pair = the audience (on the slide); second pair = /presenter/ (Simon; defaults to the first pair)
 set -euo pipefail
 [ "$(id -u)" = 0 ] || { echo "run as root" >&2; exit 1; }
-USER_="${1:?usage: 03-stack.sh <user> <password>}"; PASS_="${2:?usage: 03-stack.sh <user> <password>}"
+USER_="${1:?usage: 03-stack.sh <user> <password> [presenter-user presenter-password]}"; PASS_="${2:?usage}"
+PUSER_="${3:-$USER_}"; PPASS_="${4:-$PASS_}"
 REPO=git@github.com:simonhg321/ctxdemo.git; DEST=/srv/projects/ctxdemo
 
 # 1. git over the deploy key (read-only on GitHub).
@@ -21,8 +23,10 @@ echo "== code: $(git -C $DEST log --oneline -1)"
 mkdir -p /srv/data/caddy /srv/data/logs /srv/data/hf
 HASH=$(docker run --rm caddy:2 caddy hash-password --plaintext "$PASS_")
 printf '%s %s\n' "$USER_" "$HASH" > /srv/data/caddy/htpasswd
-chmod 600 /srv/data/caddy/htpasswd
-echo "== htpasswd: user $USER_"
+PHASH=$(docker run --rm caddy:2 caddy hash-password --plaintext "$PPASS_")
+printf '%s %s\n' "$PUSER_" "$PHASH" > /srv/data/caddy/htpasswd-presenter
+chmod 600 /srv/data/caddy/htpasswd /srv/data/caddy/htpasswd-presenter
+echo "== htpasswd: audience $USER_ · presenter $PUSER_"
 
 # 3. Up. vLLM pulls the model on first start (~8.7 GB) — ctxdemo waits for its healthcheck.
 cd $DEST/deploy/linode

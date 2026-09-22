@@ -306,3 +306,35 @@ def test_wire_is_indexed_in_the_explain_bar_and_linked_from_personas(client):
     assert "25-wire.md" in client.get("/static/peek/explain.json").json()
     assert "'wire'" in client.get("/static/peek/persona.js").text          # the "how do we know?" link sends a wire message
     assert "show=wire" in client.get("/static/peek/wall.html").text        # the wall hosts it as an overlay
+
+
+def test_audience_clamp_only_when_configured_and_no_presenter_header(fake, cfg):
+    """NFCU Linode: plain visitors get a 4k backpack, a 600-token leash and no web search; /presenter/ (Caddy adds
+    X-Presenter) gets the full set; Gonzaga (audience=False) is unchanged whatever the header says."""
+    from dataclasses import replace
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, audience=True)))
+    body = {"mode": "endless", "board": True, "peek": True, "tools": True, "window": 32768, "max_tokens": 10000}
+    aud = c.post("/api/session", json=body).json()
+    assert aud["state"]["window_tokens"] == 4096 and aud["state"]["max_tokens"] == 600 and aud["state"]["tools"] is False
+    pres = c.post("/api/session", json=body, headers={"X-Presenter": "1"}).json()
+    assert pres["state"]["window_tokens"] == 32768 and pres["state"]["max_tokens"] == 10000 and pres["state"]["tools"] is True
+    assert c.get("/api/health").json()["audience"] is True
+    assert c.get("/api/health", headers={"X-Presenter": "1"}).json()["audience"] is False
+    g = TestClient(create_app(vllm=fake, cfg=cfg))                      # Gonzaga: no clamp, header ignored
+    assert g.post("/api/session", json=body).json()["state"]["window_tokens"] == 32768
+    assert g.get("/api/health").json()["audience"] is False
+
+
+def test_audience_env_flag(monkeypatch):
+    from app.config import load
+    monkeypatch.setenv("CTXDEMO_AUDIENCE", "1")
+    assert load().audience is True
+    monkeypatch.delenv("CTXDEMO_AUDIENCE")
+    assert load().audience is False
+
+
+def test_driver_and_wall_use_the_audience_helpers(client):
+    d = client.get("/static/peek/driver.js").text
+    assert "peekLib.asksFor(" in d and "audience" in d
+    w = client.get("/static/peek/wall.html").text
+    assert "peekLib.wallFit(" in w and "stack" in w

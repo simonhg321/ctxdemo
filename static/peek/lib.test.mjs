@@ -98,3 +98,14 @@ test('wireHighlight: pretty JSON, HTML-escaped, the logprob keys marked', () => 
   assert.ok(html.includes('&lt;b&gt;&amp;') && !html.includes('<b>'));
   assert.equal(L.wireHighlight(null), '');
 });
+test('asksFor: the audience gets the short questions only; the presenter gets all seven', () => {
+  const all = L.asksFor(false), aud = L.asksFor(true);
+  assert.equal(all.length, 7); assert.ok(aud.length >= 4 && aud.length < all.length);
+  assert.ok(aud.every(a => all.includes(a)));
+  assert.ok(!aud.some(a => /every country|US president|TCP/.test(a)));
+  assert.ok(aud.some(a => /Monty Hall/.test(a)));
+});
+test('wallFit: stacked on laptops, frozen on the big screen, explicit ?fit= wins', () => {
+  assert.equal(L.wallFit(1440, null), 'stack'); assert.equal(L.wallFit(3840, null), 'frozen');
+  assert.equal(L.wallFit(3840, 'stack'), 'stack'); assert.equal(L.wallFit(1280, 'frozen'), 'frozen');
+});

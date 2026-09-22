@@ -1,6 +1,6 @@
 """ctxdemo — 'The Backpack'. FastAPI routes + static page."""
 from pathlib import Path
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -107,9 +107,16 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     def index():
         return FileResponse(ROOT / "static" / "index.html")
 
+    AUDIENCE_WINDOW, AUDIENCE_MAX_TOKENS = 4096, 600
+
+    def is_audience(request: Request) -> bool:
+        """Linode only (cfg.audience): everyone is the audience unless Caddy's /presenter/ route added X-Presenter."""
+        return cfg.audience and request.headers.get("x-presenter") != "1"
+
     @app.get("/api/health")
-    def health():
+    def health(request: Request):
         return {"vllm": "ok" if vllm.health() else "down", "model": cfg.model, "window_tokens": cfg.window_tokens,
+                "audience": is_audience(request),
                 "vision": "ok" if vision.health() else "down", "vision_model": getattr(vision, "model", cfg.model),
                 "exact_counts": getattr(vllm, "exact", True), "board_window": cfg.board_window,
                 "ears": ("ok" if ears.health() else "down") if ears else "none", "listen_seconds": cfg.listen_seconds,
@@ -126,9 +133,13 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         return {"turns": [t.__dict__ for t in scr.turns], "details": {k: v.__dict__ for k, v in scr.details.items()}}
 
     @app.post("/api/session")
-    def new_session(req: NewSession = Body(...)):
+    def new_session(request: Request, req: NewSession = Body(...)):
         if req.mode not in ("endless", "compact", "handoff"):
             raise HTTPException(400, "mode must be endless|compact|handoff")
+        if is_audience(request):                         # the room shares one GPU: small backpack, short leash, no web
+            req = req.model_copy(update={"window": min(req.window or AUDIENCE_WINDOW, AUDIENCE_WINDOW),
+                                         "max_tokens": min(req.max_tokens or AUDIENCE_MAX_TOKENS, AUDIENCE_MAX_TOKENS),
+                                         "tools": False})
         board_window = max(1024, min(32768, req.window)) if req.window else cfg.board_window   # 32k = the box's whole context: lets the wall overflow on purpose
         scfg = replace(cfg, window_tokens=board_window) if req.board else cfg
         if req.max_tokens:

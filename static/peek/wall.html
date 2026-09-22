@@ -5,6 +5,18 @@
 #wall-frames{position:absolute;left:0;right:0;top:0;bottom:0}
 body.explain-bar-active #wall-frames{top:var(--explain-bar-h)}   /* only shifts down when explain.js actually mounted the bar */
 iframe{position:absolute;border:0;border-radius:6px;outline:1px solid #262d36}
+/* laptop: a scrolling stack instead of frozen boxes (peekLib.wallFit picks it under 1900 px; ?fit=stack|frozen forces) */
+body.stack{overflow:auto}
+body.stack #wall-frames{position:static;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
+body.stack.explain-bar-active #wall-frames{padding-top:calc(var(--explain-bar-h) + 8px)}
+body.stack iframe{position:static;width:100%;display:block}
+body.stack iframe[data-panel=driver]{grid-column:1/-1;height:34vh}
+body.stack iframe[data-panel=chunks]{grid-column:1/-1;height:14vh}
+body.stack iframe[data-panel=answer]{grid-column:1/-1;height:60vh}
+body.stack iframe[data-panel=persona]{height:70vh}
+body.stack iframe[data-panel=almost]{height:70vh}
+body.stack iframe[data-panel=tiles]{grid-column:1/-1;height:22vh}
+@media (max-width:900px){body.stack #wall-frames{grid-template-columns:1fr} body.stack iframe[data-panel=persona],body.stack iframe[data-panel=almost]{height:55vh}}
 #wire-overlay{position:fixed;inset:0;z-index:25;display:none;background:rgba(4,6,8,.78)}
 #wire-overlay.open{display:block}
 #wire-overlay iframe{left:4%;top:calc(var(--explain-bar-h) + 3vh);width:92%;height:calc(94vh - var(--explain-bar-h));outline-color:#7fc8e8}</style></head>
@@ -13,13 +25,16 @@ iframe{position:absolute;border:0;border-radius:6px;outline:1px solid #262d36}
   const q = new URLSearchParams(location.search), room = q.get('room') || 'wall';
   // Six boxes: ask + chunks + answer down the left, who-it-speaks-as and what-it-almost-said down the right, the numbers along the bottom.
   const DEFAULT = { driver: [2, 3, 60, 27], chunks: [2, 32, 60, 9], answer: [2, 43, 60, 34], persona: [64, 3, 34, 46], almost: [64, 51, 34, 26], tiles: [2, 79, 96, 18] };
+  const fit = peekLib.wallFit(window.innerWidth, q.get('fit'));
   function build(layout) {
     document.body.innerHTML = '<div id="wall-frames"></div>';
+    document.body.classList.toggle('stack', fit === 'stack');
     const host = document.getElementById('wall-frames');
     for (const [name, [x, y, w, h]] of Object.entries(layout)) {
       const f = document.createElement('iframe');
+      f.dataset.panel = name;
       f.src = `panel.html?show=${encodeURIComponent(name)}&room=${encodeURIComponent(room)}` + (name === 'driver' && q.get('replay') === '1' ? '&replay=1' : '');
-      Object.assign(f.style, { left: x + '%', top: y + '%', width: w + '%', height: h + '%' });
+      if (fit === 'frozen') Object.assign(f.style, { left: x + '%', top: y + '%', width: w + '%', height: h + '%' });
       host.appendChild(f);
     }
   }

@@ -1,15 +1,30 @@
-# demo.instockornot.club — Let's Encrypt automatic. Whole site behind one shared basic-auth (the word on the slide).
+# demo.instockornot.club — Let's Encrypt automatic.
+#   /            the audience: shared password (on the slide); the server clamps these sessions (4k, 600 tokens, no web)
+#   /presenter/  Simon: second password; Caddy adds X-Presenter so the server gives the full set (32k, long leash, web)
 demo.instockornot.club {
 	encode zstd gzip
-	basic_auth {
-		import /etc/caddy/htpasswd
-	}
-	redir / /static/peek/wall.html 302
-	reverse_proxy ctxdemo:8200
 	log {
 		output file /data/access.log {
 			roll_size 20mb
 			roll_keep 3
+		}
+	}
+	handle_path /presenter/* {
+		basic_auth {
+			import /etc/caddy/htpasswd-presenter
+		}
+		redir / /static/peek/wall.html 302
+		reverse_proxy ctxdemo:8200 {
+			header_up X-Presenter 1
+		}
+	}
+	handle {
+		basic_auth {
+			import /etc/caddy/htpasswd
+		}
+		redir / /static/peek/wall.html 302
+		reverse_proxy ctxdemo:8200 {
+			header_up -X-Presenter
 		}
 	}
 }

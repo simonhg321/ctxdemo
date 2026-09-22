@@ -250,4 +250,5 @@ class Session:
                 "totals": {"sent": self.total_sent, "new": self.total_new, "typed": self.total_typed,
                            "cost_usd": self._cost(self.total_sent, self.total_new)},
                 "window_tokens": self.cfg.window_tokens, "next_would_send": self.vllm.count_messages(self.messages),
+                "max_tokens": self.cfg.answer_max_tokens, "tools": self.tools is not None,
                 "graph": self.graph.to_dict()}
