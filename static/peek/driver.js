@@ -2,7 +2,7 @@
 peekPanels.driver = (function () {
   let el, sid = null, busy = false, lastTurn = null, lastSelect = null, persona = null;
   const API = '../../api/';                                  // relative: the app lives under /demo/ behind Caddy
-  const ASKS = ['Pick a number between 1 and 10', 'Write one line about fog', 'Name a colour, then a fruit, then a city', 'Finish this: roses are red, violets are…'];
+  const ASKS = ['Pick a number between 1 and 10', 'Divide by 3 in C using only shifts', 'Name a colour, then a fruit, then a city', 'Finish this: roses are red, violets are…'];
   async function post(path, body) {
     const r = await fetch(API + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
