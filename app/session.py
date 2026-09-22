@@ -51,6 +51,7 @@ class TurnResult:
     tool_uses: list[dict] = field(default_factory=list)   # {name, args, result} per tool call this turn
     graph_delta: dict = field(default_factory=lambda: {"added": [], "bumped": [], "edges": []})   # the map
     tokens: list[dict] = field(default_factory=list)        # act 6: {t, p, alts} per piece of the answer (peek sessions only)
+    cut: bool = False                                       # the answer hit answer_max_tokens: the server stopped it, the model did not
     user_chunks: list[str] = field(default_factory=list)    # act 6: the user's sentence split into the model's pieces
 
     def to_dict(self) -> dict:
@@ -205,7 +206,7 @@ class Session:
                         event=event, event_text=event_text, cost_usd=self._cost(sent, new),
                         total_sent=self.total_sent + sent, total_new=self.total_new + new, tool_uses=uses,
                         graph_delta=delta,
-                        tokens=r.tokens if self.peek else [],
+                        tokens=r.tokens if self.peek else [], cut=r.cut,
                         user_chunks=self.chunker.split(user_text) if (self.peek and self.chunker) else [])
         self.turns.append(tr)
         if event:

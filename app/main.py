@@ -44,6 +44,7 @@ class NewSession(BaseModel):
     peek: bool = False           # act 6: return the guesses behind each piece of the answer
     persona: str | None = None   # act 6: config/personas/<id>.md — the system prompt speaks as this persona
     system: str | None = None    # act 6: free-text system prompt; wins over persona ("" = no system message at all)
+    max_tokens: int | None = None  # act 6: longer leash for personas that ask for long answers (clamped 100-1500)
 
 
 class HearReq(BaseModel):
@@ -129,6 +130,9 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         if req.mode not in ("endless", "compact", "handoff"):
             raise HTTPException(400, "mode must be endless|compact|handoff")
         board_window = max(1024, min(8192, req.window)) if req.window else cfg.board_window
+        scfg = replace(cfg, window_tokens=board_window) if req.board else cfg
+        if req.max_tokens:
+            scfg = replace(scfg, answer_max_tokens=max(100, min(1500, req.max_tokens)))
         if req.system is not None:                       # custom free text always wins, even "" (no system message)
             system_prompt, persona_label = req.system, "custom"
         elif req.persona is not None:
@@ -139,7 +143,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         else:
             system_prompt = SYSTEM_MAP if req.teach else SYSTEM_BOARD if req.board else SYSTEM
             persona_label = None
-        s = Session(req.mode, vllm, replace(cfg, window_tokens=board_window) if req.board else cfg,
+        s = Session(req.mode, vllm, scfg,
                     system_prompt=system_prompt, persona=persona_label,
                     tools=tools if req.tools else None, peek=req.peek, chunker=chunker)
         sessions[s.id] = s

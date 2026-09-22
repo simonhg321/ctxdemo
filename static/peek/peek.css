@@ -27,6 +27,7 @@ body { background: var(--ground); color: var(--bone); font: var(--u)/1.45 "Helve
 #panel.row .tile { flex: 1 1 12em; min-width: 0; }
 #panel.row .tile .big { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #out { font-size: 1.8em; line-height: 1.5; flex: 1; min-height: 0; overflow-y: auto; }
+#out .cut { display: block; margin-top: .4em; font-size: .55em; color: var(--ice); }   /* the server's leash, not the model stopping */
 #strip { font-size: 1.5em; line-height: 1.6; }
 button, input[type=text] { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: .25em; padding: .4em .7em; }
 button { cursor: pointer; } button:hover { border-color: var(--dim); } button:disabled { opacity: .4; }

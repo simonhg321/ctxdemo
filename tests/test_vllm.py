@@ -107,3 +107,10 @@ def test_parse_logprobs_drops_end_of_turn_marker():
         {"token": "Hi", "logprob": -0.1, "top_logprobs": [{"token": "Hi", "logprob": -0.1}]},
         {"token": "<|im_end|>", "logprob": -0.01, "top_logprobs": [{"token": "<|im_end|>", "logprob": -0.01}]}]}}
     assert [t["t"] for t in parse_logprobs(choice)] == ["Hi"]        # vLLM lists the stop token as a piece; Ollama does not
+
+
+def test_chat_sets_cut_on_finish_reason_length():
+    def handler(request):
+        return httpx.Response(200, json={"choices": [{"message": {"content": "abc"}, "finish_reason": "length"}], "usage": {}})
+    v = VLLM("http://x", "m", transport=httpx.MockTransport(handler))
+    assert v.chat([{"role": "user", "content": "hi"}], 5).cut is True

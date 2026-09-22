@@ -14,6 +14,7 @@ class ChatResult:
     seconds: float
     tool_calls: list[dict] = field(default_factory=list)   # OpenAI format: {id, type, function:{name, arguments}}
     tokens: list[dict] = field(default_factory=list)       # peek only: {t, p, alts:[{t, p}]} per generated piece
+    cut: bool = False                                      # True when the server stopped it at max_tokens (finish_reason "length")
 
 
 def text_of(content) -> str:
@@ -93,7 +94,7 @@ class VLLM:
         return ChatResult(text=(text_of(msg.get("content"))).strip(),
                           prompt_tokens=int(u.get("prompt_tokens", 0)), completion_tokens=int(u.get("completion_tokens", 0)),
                           seconds=time.time() - t0, tool_calls=list(msg.get("tool_calls") or []),
-                          tokens=parse_logprobs(choice))
+                          tokens=parse_logprobs(choice), cut=choice.get("finish_reason") == "length")
 
     def chat(self, messages: list[dict], max_tokens: int, tools: list[dict] | None = None, peek: bool = False) -> ChatResult:
         body = {"model": self.model, "messages": messages, "max_tokens": max_tokens, "temperature": 0,

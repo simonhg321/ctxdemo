@@ -269,3 +269,22 @@ def test_act6_pages_are_served(client):
         body = client.get(f"/static/peek/{f}").text
         assert 'src="/' not in body and "fetch('/" not in body and "'/api" not in body, f
     assert "panel.html?show=" in client.get("/static/peek/wall.html").text
+
+
+def test_session_max_tokens_is_clamped_and_used(fake, cfg):
+    c = TestClient(create_app(vllm=fake, cfg=cfg))
+    sid = c.post("/api/session", json={"mode": "endless", "max_tokens": 9000}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    assert fake.calls[-1]["max_tokens"] == 1500                       # clamped to the ceiling
+    sid = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    assert fake.calls[-1]["max_tokens"] == cfg.answer_max_tokens      # unset: unchanged
+
+
+def test_turn_reports_cut_when_server_stopped_it(fake, cfg):
+    from app.vllm import ChatResult
+    c = TestClient(create_app(vllm=fake, cfg=cfg))
+    sid = c.post("/api/session", json={"mode": "endless"}).json()["session_id"]
+    fake.responses.append(ChatResult(text="long answer that", prompt_tokens=0, completion_tokens=3, seconds=0.1, cut=True))
+    assert c.post("/api/turn", json={"session_id": sid, "text": "hi"}).json()["turn"]["cut"] is True
+    assert c.post("/api/turn", json={"session_id": sid, "text": "hi"}).json()["turn"]["cut"] is False

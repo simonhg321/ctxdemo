@@ -25,7 +25,11 @@ peekPanels.answer = (function () {
       let i = 0;
       const ring = new Set(peekLib.hesitations(toks, 3));
       timer = setInterval(() => {
-        if (i >= toks.length) { clearInterval(timer); out.querySelectorAll('.piece').forEach(s => ring.has(+s.dataset.i) && s.classList.add('ring')); return; }
+        if (i >= toks.length) {
+          clearInterval(timer); out.querySelectorAll('.piece').forEach(s => ring.has(+s.dataset.i) && s.classList.add('ring'));
+          if (t.cut) { const c = document.createElement('span'); c.className = 'cut'; c.textContent = ` ⏹ cut off here — the wall allows ${toks.length} pieces per answer; the model was not done`; out.appendChild(c); }
+          return;
+        }
         const s = document.createElement('span');
         s.className = 'piece ' + peekLib.tone(toks[i].p); s.dataset.i = i; s.textContent = toks[i].t;
         out.appendChild(s); i++;
