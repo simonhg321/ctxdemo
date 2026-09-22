@@ -263,7 +263,7 @@ def test_act6_pages_are_served(client):
     html = client.get("/").text
     assert 'data-tab="guess"' in html and 'id="tab-guess"' in html
     for f in ("panel.html", "wall.html", "bus.js", "lib.js", "peek.css", "replay.json",
-              "driver.js", "chunks.js", "answer.js", "almost.js", "tiles.js"):
+              "driver.js", "chunks.js", "answer.js", "almost.js", "tiles.js", "persona.js"):
         assert client.get(f"/static/peek/{f}").status_code == 200, f
     for f in ("wall.html", "panel.html", "driver.js"):
         body = client.get(f"/static/peek/{f}").text

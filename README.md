@@ -48,4 +48,7 @@ How the model reads and chooses: the sentence in pieces (tokens), the answer col
 - Turn log: set `CTXDEMO_TURNLOG=/path/turns.jsonl` and every question + answer (tab, seconds, act 6 hesitation numbers, typed/voice/board) is appended as one JSON line to that file — nothing goes to the container log. Unset (the default) nothing is written anywhere, and the `hear:` transcript lines are silenced too. On the box: `/srv/projects/ctxdemo/data/logs/turns.jsonl` (`tail -f`, or `jq -r '"\(.ts)  \(.user)  →  \(.answer)"'`).
 - Server: sessions created with `peek: true` ask the chat server for `logprobs` (same request on Ollama and vLLM). Chunks need `CTXDEMO_TOKENIZER` (HF repo of the chat model's tokenizer); unset → strip shows the plain sentence.
 - JS helper tests: `node --test static/peek/*.test.mjs`. Spec: `docs/specs/2026-09-21-ctxdemo-guesses-design.md`.
+- Personas: `config/personas/<id>.md` (title / one-line blurb / system prompt, prompt may be empty) pick who the model
+  answers as; served at `GET /api/personas`, picked from the wall with `static/peek/panel.html?show=persona&room=wall`
+  (not in `wall.html`'s DEFAULT layout — add it to a custom `?layout=` to place it).
 

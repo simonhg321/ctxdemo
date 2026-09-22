@@ -30,3 +30,10 @@ body { background: var(--ground); color: var(--bone); font: var(--u)/1.45 "Helve
 button, input[type=text] { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: .25em; padding: .4em .7em; }
 button { cursor: pointer; } button:hover { border-color: var(--dim); } button:disabled { opacity: .4; }
 input[type=text] { width: 100%; }
+#panel.persona .persona-list { display: flex; flex-direction: column; gap: .4em; overflow-y: auto; min-height: 0; }
+#panel.persona .persona-btn { display: block; width: 100%; text-align: left; }
+#panel.persona .persona-btn .t { font-weight: 600; }
+#panel.persona .persona-btn .b { font-size: .75em; margin-top: .15em; }
+#panel.persona .persona-btn.active, #panel.persona #custom.active { border-color: var(--ice); box-shadow: inset 0 0 0 .07em var(--ice); }
+#panel.persona textarea { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: .25em; padding: .4em .7em; width: 100%; resize: vertical; }
+#panel.persona #custom-form { display: flex; flex-direction: column; gap: .4em; }

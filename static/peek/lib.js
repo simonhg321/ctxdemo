@@ -16,6 +16,10 @@
              worst: { i: w.i, chosen: w.t, runner: runner ? runner.t : null } };
   }
   const revealDelay = (seconds, n) => Math.max(15, Math.round(Math.min(seconds, 8) * 1000 / Math.max(1, n)));
-  const api = { tone, pct, isBlank, hesitations, stats, revealDelay };
+  // act 6, persona panel: the button model (custom is a fixed button the panel draws itself, never in this list).
+  const personaModel = (personas, activeId) => (personas || []).map(p => ({ ...p, active: p.id === activeId }));
+  // what to add to the /api/session body for the currently-picked persona: an id, or free text for "custom".
+  const personaSessionFields = persona => (!persona ? {} : persona.id === 'custom' ? { system: persona.prompt } : { persona: persona.id });
+  const api = { tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.peekLib = api;
 })(typeof window !== 'undefined' ? window : globalThis);

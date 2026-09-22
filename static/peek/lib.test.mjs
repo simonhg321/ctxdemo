@@ -25,3 +25,18 @@ test('stats', () => {
 test('revealDelay: real pace, capped at 8 s total, floor 15 ms', () => {
   assert.equal(L.revealDelay(2, 40), 50); assert.equal(L.revealDelay(30, 100), 80); assert.equal(L.revealDelay(0.01, 100), 15);
 });
+test('personaModel: marks the active persona, custom handled elsewhere', () => {
+  const personas = [{ id: 'wall', title: 'On the wall', blurb: 'b1' }, { id: 'pirate', title: 'Pirate', blurb: 'b2' }];
+  assert.deepEqual(L.personaModel(personas, 'pirate'), [
+    { id: 'wall', title: 'On the wall', blurb: 'b1', active: false },
+    { id: 'pirate', title: 'Pirate', blurb: 'b2', active: true },
+  ]);
+  assert.deepEqual(L.personaModel(personas, null).map(b => b.active), [false, false]);
+  assert.deepEqual(L.personaModel(personas, 'custom').map(b => b.active), [false, false]);
+  assert.deepEqual(L.personaModel(undefined, 'x'), []);
+});
+test('personaSessionFields: persona id, or custom free text', () => {
+  assert.deepEqual(L.personaSessionFields(null), {});
+  assert.deepEqual(L.personaSessionFields({ id: 'pirate', prompt: 'Arr' }), { persona: 'pirate' });
+  assert.deepEqual(L.personaSessionFields({ id: 'custom', prompt: 'be nice' }), { system: 'be nice' });
+});

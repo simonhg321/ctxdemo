@@ -1,6 +1,6 @@
 // The driver: the only panel that talks to the server. Everything else listens on the bus.
 peekPanels.driver = (function () {
-  let el, sid = null, busy = false, lastTurn = null, lastSelect = null;
+  let el, sid = null, busy = false, lastTurn = null, lastSelect = null, persona = null;
   const API = '../../api/';                                  // relative: the app lives under /demo/ behind Caddy
   const ASKS = ['Pick a number between 1 and 10', 'Write one line about fog', 'Name a colour, then a fruit, then a city', 'Finish this: roses are red, violets are…'];
   async function post(path, body) {
@@ -12,7 +12,7 @@ peekPanels.driver = (function () {
     text = (text || '').trim(); if (!text || busy) return;
     busy = true; status('thinking…'); el.querySelectorAll('button,input').forEach(b => b.disabled = true);
     try {
-      if (!sid) sid = (await post('session', { mode: 'compact', board: true, peek: true })).session_id;
+      if (!sid) sid = (await post('session', Object.assign({ mode: 'compact', board: true, peek: true }, peekLib.personaSessionFields(persona)))).session_id;
       const r = await post('turn', { session_id: sid, text });
       sendTurn(r);
       status(r.turn.event === 'compacted' ? 'the backpack was full — it compacted first' : '');
@@ -34,7 +34,13 @@ peekPanels.driver = (function () {
       el.querySelector('#f').onsubmit = e => { e.preventDefault(); ask(el.querySelector('#q').value); };
       el.querySelector('#new').onclick = () => { sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {}); status(''); };
       peekBus.on('select', d => { if (lastTurn) lastSelect = d; });
-      peekBus.on('hello', () => {                              // a panel opened late: repeat the last turn for it
+      peekBus.on('persona', d => {                              // a persona button was picked: speak as it, starting fresh
+        if (persona && persona.id === d.id && persona.title === d.title && persona.prompt === d.prompt) return;   // our own hello re-send: not a real change
+        persona = d; sid = null; lastTurn = null; lastSelect = null;
+        peekBus.send('clear', {}); status('speaking as: ' + d.title);
+      });
+      peekBus.on('hello', () => {                              // a panel opened late: repeat the last turn (and persona) for it
+        if (persona) peekBus.send('persona', persona);
         if (!lastTurn) return;
         const s = lastSelect;
         peekBus.send('turn', lastTurn); if (s) peekBus.send('select', s);
