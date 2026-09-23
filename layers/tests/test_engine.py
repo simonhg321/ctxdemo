@@ -45,3 +45,20 @@ def test_analyze_needs_messages_or_prompt():
     import pytest
     with pytest.raises(ValueError):
         make().analyze()
+
+
+def test_analyze_attention_dedup_when_decided_at_equals_last():
+    """Collision case: top-1 stabilises only at the last layer, so early and decided/last coincide."""
+    class StubRunnerNoDecision:
+        n_layers = 3
+        tokenizer = StubTok()
+        seen = None
+        def forward(self, ids):
+            StubRunnerNoDecision.seen = list(ids)
+            tops = [[("a", 0.3), ("b", 0.2)], [("b", 0.4), ("a", 0.1)], [("Yes", 0.9), ("No", 0.05)]]
+            attn = [[0.8, 0.1, 0.1] + [0.0] * (len(ids) - 3)] * 3
+            return tops, attn
+    engine = Engine("stub/no-decision", device="cpu", loader=lambda name, device: StubRunnerNoDecision())
+    r = engine.analyze(messages=[{"role": "user", "content": "hi"}], prefix="X")
+    assert r["decided_at"] == 3
+    assert [a["layer"] for a in r["attention"]] == [1, 3]
