@@ -105,8 +105,8 @@ test('asksFor: the audience gets the short questions only; the presenter gets al
   assert.ok(!aud.some(a => /every country|US president|TCP/.test(a)));
   assert.ok(aud.some(a => /Monty Hall/.test(a)));
 });
-test('wallFit: stacked on laptops, frozen on the big screen, explicit ?fit= wins', () => {
-  assert.equal(L.wallFit(1440, null), 'stack'); assert.equal(L.wallFit(3840, null), 'frozen');
+test('wallFit: frozen everywhere by default, ?fit=stack opts in', () => {
+  assert.equal(L.wallFit(1440, null), 'frozen'); assert.equal(L.wallFit(3840, null), 'frozen');
   assert.equal(L.wallFit(3840, 'stack'), 'stack'); assert.equal(L.wallFit(1280, 'frozen'), 'frozen');
 });
 test('queueLine: what the ask box says while waiting', () => {

@@ -68,8 +68,8 @@
     'Every US president in order, with years and one thing each is remembered for',
     'Explain how TCP delivers a file, step by step, from SYN to the last ACK'];
   const asksFor = audience => (audience ? ASKS_SHORT : ASKS_SHORT.concat(ASKS_LONG));
-  // wall.html: frozen %-boxes on a big screen, a scrolling stack on a laptop; ?fit=stack|frozen forces it.
-  const wallFit = (width, fit) => (fit === 'stack' || fit === 'frozen' ? fit : width < 1900 ? 'stack' : 'frozen');
+  // wall.html: the frozen %-boxes everywhere (Simon prefers them on the laptop too); ?fit=stack opts into the scrolling stack.
+  const wallFit = (width, fit) => (fit === 'stack' ? 'stack' : 'frozen');
   // the ask box's waiting line, from /api/queue: '' when idle or unknown.
   const queueLine = q => (!q || (!q.running && !q.waiting) ? '' : `${q.running} answering` + (q.waiting ? ` · ${q.waiting} waiting` : ''));
   const api = { queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight };
