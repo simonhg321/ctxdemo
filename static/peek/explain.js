@@ -95,6 +95,7 @@
     peekBus.on('persona', d => { personaSuffix(d.title); pulse('persona'); });
     peekBus.on('clear', () => personaSuffix(null));
     peekBus.on('wire', d => { if (d && d.open) pulse('wire'); });
+    peekBus.on('layers', () => pulse('layers'));
     peekBus.send('hello', {});   // late joiner: ask the driver to repeat the current persona (if any)
   }
 

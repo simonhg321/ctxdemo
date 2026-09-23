@@ -30,7 +30,7 @@ peekPanels.driver = (function () {
   }
   function status(s) { el.querySelector('#st').textContent = s; }
   function sendTurn(msg) {
-    const slim = { turn: msg.turn, state: msg.state ? { window_tokens: msg.state.window_tokens, next_would_send: msg.state.next_would_send } : null };
+    const slim = { turn: msg.turn, session_id: sid, state: msg.state ? { window_tokens: msg.state.window_tokens, next_would_send: msg.state.next_would_send } : null };
     lastTurn = slim; lastSelect = null; peekBus.send('turn', slim);
   }
   return {

@@ -87,3 +87,16 @@ mark { background: rgba(242,169,59,.35); color: var(--bone); border-radius: .2em
 .tile.model #model-pick { display: flex; gap: .4em; flex-wrap: wrap; margin: .3em 0 .5em; font-size: .75em; padding-bottom: .5em; border-bottom: 1px solid var(--line); }
 .tile.model #model-pick select { flex: 1 1 12em; min-width: 0; }
 .tile.model select, .tile.model input[type=password] { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: .25em; padding: .3em .5em; }
+
+/* the layers panel */
+#panel.layers .lbody { display: grid; grid-template-columns: minmax(10em, 34%) 1fr; gap: .8em; flex: 1; min-height: 0; }
+#panel.layers .lcol { display: flex; flex-direction: column; gap: .12em; overflow-y: auto; min-height: 0; font-size: .7em; }
+#panel.layers .lchip { display: grid; grid-template-columns: 2em 1fr 3em auto; gap: .4em; align-items: baseline; padding: .1em .4em; border-radius: .2em; border-left: .25em solid var(--line); color: var(--dim); }
+#panel.layers .lchip .ln { text-align: right; } #panel.layers .lchip .lt { white-space: pre; overflow: hidden; text-overflow: ellipsis; color: var(--bone); }
+#panel.layers .lchip.sure { border-left-color: var(--moss); background: rgba(155,191,106,.14); }
+#panel.layers .lchip.unsure { border-left-color: var(--amber); background: rgba(242,169,59,.14); }
+#panel.layers .lchip.flip { border-left-color: var(--red); background: rgba(224,85,60,.18); }
+#panel.layers .lchip.decided { outline: 1px solid var(--ice); } #panel.layers .ldec { color: var(--ice); font-size: .85em; }
+#panel.layers .lheat { display: flex; flex-direction: column; gap: .4em; min-height: 0; overflow: auto; }
+#panel.layers #heat { line-height: 1.7; font-size: .9em; } #panel.layers .hcell { padding: .05em .15em; border-radius: .2em; white-space: pre; }
+#panel.layers .linkish { font-size: .8em; padding: .1em .4em; }

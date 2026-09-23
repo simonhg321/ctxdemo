@@ -475,3 +475,14 @@ def test_api_layers_off_and_down(fake, cfg):
     sid2 = badjson.post("/api/session", json={"mode": "compact", "board": True, "peek": True}).json()["session_id"]
     badjson.post("/api/turn", json={"session_id": sid2, "text": "hi"})
     assert badjson.post("/api/layers", json={"session_id": sid2, "index": 0}).status_code == 502
+
+
+def test_layers_panel_chip_and_wall_slot_are_served(client):
+    assert client.get("/static/peek/layers.js").status_code == 200
+    assert "45-layers.md" in client.get("/static/peek/explain.json").json()
+    assert client.get("/static/peek/explain/45-layers.md").status_code == 200
+    assert "'layers'" in client.get("/static/peek/wall.html").text            # ?with=layers slot
+    d = client.get("/static/peek/driver.js").text
+    assert "session_id" in d and "'turn', slim" in d and "sid" in d           # the driver puts the session id on the turn message (Step 3)
+    js = client.get("/static/peek/layers.js").text
+    assert "api/layers" in js and "peekLib.layersModel(" in js and "peekLib.words(" in js and "fetch('/" not in js
