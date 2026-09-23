@@ -32,6 +32,7 @@ class Config:
     audience: bool = False               # NFCU Linode: clamp sessions without an X-Presenter header (4k window, 600-token leash, no tools)
     room: bool = False                   # NFCU: show the optional first-name box (feeds the presenter's room panel)
     netdata_url: str = ""                # NFCU: Netdata agent for /api/gpu (GPU busy % in the tiles); empty = no tile
+    layers_url: str = ""                 # piece 4: the "inside the head" sidecar (LAYERS_URL); empty = the layers panel says it is off
     admin_password: str = ""             # NFCU: password for the model switch; empty = switching disabled
     compose_dir: str = ""                # NFCU: where docker-compose.yaml + .env live (mounted into the container); empty = disabled
     hf_hub_dir: str = ""                 # NFCU: the vLLM model cache (…/hub) to flag which models are already downloaded
@@ -53,6 +54,7 @@ def load(root: Path = ROOT) -> Config:
     demo["vocab"] = "plain" if os.environ.get("CTXDEMO_VOCAB") == "plain" else "wall"
     demo["room"] = os.environ.get("CTXDEMO_ROOM") == "1"
     demo["netdata_url"] = os.environ.get("NETDATA_URL", "")
+    demo["layers_url"] = os.environ.get("LAYERS_URL", "")
     demo["admin_password"] = os.environ.get("CTXDEMO_ADMIN_PASSWORD", "")
     demo["compose_dir"] = os.environ.get("CTXDEMO_COMPOSE_DIR", "")
     demo["hf_hub_dir"] = os.environ.get("CTXDEMO_HF_HUB", "")

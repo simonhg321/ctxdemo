@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from app.main import create_app
@@ -419,3 +421,44 @@ def test_vocab_flag_reaches_health_and_the_panels_use_it(client, monkeypatch):
     for f in ("tiles.js", "chunks.js", "driver.js", "wire.js", "answer.js", "almost.js"):
         assert "peekLib.words(" in client.get(f"/static/peek/{f}").text, f
     assert "plainText(" in client.get("/static/peek/explain.js").text                   # the explain cards too
+
+
+def test_api_layers_sends_the_sessions_real_messages_and_the_answer_prefix(fake, cfg):
+    """Piece 4: the panel asks how token i of the last answer formed; we send the messages as sent + tokens[:i] to the sidecar."""
+    from dataclasses import replace
+    import httpx
+    seen = {}
+    def sidecar(req: httpx.Request):
+        if req.url.path == "/health":
+            return httpx.Response(200, json={"model": "Qwen/Qwen3-4B", "n_layers": 36, "device": "cuda", "busy": False})
+        seen["body"] = json.loads(req.content)
+        return httpx.Response(200, json={"tokens": ["a"], "final": {"t": "Yes", "p": 0.9}, "layers": [], "decided_at": 20,
+                                         "attention": [], "cut": False, "model": "Qwen/Qwen3-4B", "n_layers": 36, "seconds": 0.2})
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, layers_url="http://layers"), layers_transport=httpx.MockTransport(sidecar)))
+    assert c.get("/api/health").json()["layers"] == "ok"
+    sid = c.post("/api/session", json={"mode": "compact", "board": True, "peek": True, "persona": "wall"}).json()["session_id"]
+    assert c.post("/api/layers", json={"session_id": sid, "index": 0}).status_code == 400          # no answer yet
+    c.post("/api/turn", json={"session_id": sid, "text": "hi there"})                                # fake answers "Echo: hi there" → tokens Echo: / hi / there
+    r = c.post("/api/layers", json={"session_id": sid, "index": 2}).json()
+    assert r["decided_at"] == 20 and r["index"] == 2 and r["wall_token"] == "there"
+    msgs = seen["body"]["messages"]
+    assert msgs[0]["role"] == "system" and msgs[-1] == {"role": "user", "content": "hi there"}          # the messages as sent, ending with the user turn
+    assert seen["body"]["prefix"] == "Echo:hi"                                                       # tokens[:2] joined as text
+    r0 = c.post("/api/layers", json={"session_id": sid}).json()                                      # index omitted = the first token
+    assert r0["index"] == 0 and r0["wall_token"] == "Echo:"
+    assert c.post("/api/layers", json={"session_id": sid, "index": 99}).status_code == 400
+    assert c.post("/api/layers", json={"session_id": "nope", "index": 0}).status_code == 404
+
+
+def test_api_layers_off_and_down(fake, cfg):
+    from dataclasses import replace
+    import httpx
+    off = TestClient(create_app(vllm=fake, cfg=cfg))
+    assert off.get("/api/health").json()["layers"] == "none"
+    assert off.post("/api/layers", json={"session_id": "x", "index": 0}).status_code == 503
+    down = TestClient(create_app(vllm=fake, cfg=replace(cfg, layers_url="http://layers"),
+                                 layers_transport=httpx.MockTransport(lambda r: httpx.Response(500, text="boom"))))
+    assert down.get("/api/health").json()["layers"] == "down"
+    sid = down.post("/api/session", json={"mode": "compact", "board": True, "peek": True}).json()["session_id"]
+    down.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    assert down.post("/api/layers", json={"session_id": sid, "index": 0}).status_code == 502

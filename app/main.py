@@ -77,7 +77,7 @@ class ListenReq(BaseModel):
     off: bool = False            # the off button: close the window now
 
 
-def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=None, personas=None, netdata_transport=None, switcher=None) -> FastAPI:
+def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=None, personas=None, netdata_transport=None, switcher=None, layers_transport=None) -> FastAPI:
     cfg = cfg or config.load()
     personas = personas if personas is not None else load_personas()
     if ears is None and cfg.ears_url:
@@ -91,6 +91,15 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     turnlog = TurnLog(cfg.turnlog)
     room: deque = deque(maxlen=60)     # the presenter's live feed: the last turns from every session, newest last
     netdata = httpx.Client(base_url=cfg.netdata_url.rstrip("/"), timeout=3, transport=netdata_transport) if cfg.netdata_url else None
+    layers = httpx.Client(base_url=cfg.layers_url.rstrip("/"), timeout=60, transport=layers_transport) if cfg.layers_url else None
+
+    def layers_health() -> str:
+        if layers is None:
+            return "none"
+        try:
+            return "ok" if layers.get("/health", timeout=3).status_code == 200 else "down"
+        except httpx.HTTPError:
+            return "down"
     if hasattr(vllm, "refresh_model"):
         vllm.refresh_model()                          # the served name may differ from config (the model switch changes it)
     if switcher is None and cfg.compose_dir and cfg.admin_password:
@@ -139,7 +148,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
                 "exact_counts": getattr(vllm, "exact", True), "board_window": cfg.board_window,
                 "ears": ("ok" if ears.health() else "down") if ears else "none", "listen_seconds": cfg.listen_seconds,
                 "compact_at": cfg.compact_at, "handoff_turn": cfg.handoff_turn, "script_turns": len(scr.turns),
-                "prices": cfg.prices, "chunks": bool(getattr(chunker, "available", False))}
+                "prices": cfg.prices, "chunks": bool(getattr(chunker, "available", False)),
+                "layers": layers_health()}
 
     @app.get("/api/queue")
     def queue():
@@ -154,6 +164,10 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     class ModelReq(BaseModel):
         id: str
         password: str = ""
+
+    class LayersReq(BaseModel):
+        session_id: str
+        index: int | None = None     # which token of the last answer; None/0 = the first
 
     @app.post("/api/model")
     def set_model(req: ModelReq = Body(...)):
@@ -185,6 +199,31 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         if is_audience(request):
             raise HTTPException(403, "presenter only")
         return {"turns": list(reversed(room))}
+
+    @app.post("/api/layers")
+    def api_layers(req: LayersReq = Body(...)):
+        """Piece 4: how token `index` of the last answer formed, layer by layer, in the sidecar's sibling model.
+        Sends the messages exactly as the session sent them (system + transcript up to the user turn) plus the answer so far."""
+        if layers is None:
+            raise HTTPException(503, "layers are off on this wall")
+        s = get(req.session_id)
+        last = next((t for t in reversed(s.turns) if t.answer is not None and t.tokens), None)
+        if last is None:
+            raise HTTPException(400, "no answer with tokens yet")
+        i = req.index or 0
+        if i < 0 or i >= len(last.tokens):
+            raise HTTPException(400, f"index must be 0..{len(last.tokens) - 1}")
+        msgs = s.messages
+        cut = max((k for k, m in enumerate(msgs) if m["role"] == "user"), default=len(msgs) - 1)   # through the last user turn
+        body = {"messages": msgs[:cut + 1], "prefix": "".join(t["t"] for t in last.tokens[:i]), "top_k": 5}
+        try:
+            r = layers.post("/layers", json=body)
+            r.raise_for_status()
+        except httpx.HTTPError as e:
+            raise HTTPException(502, f"layers sidecar: {type(e).__name__}: {e}")
+        out = r.json()
+        out.update({"index": i, "wall_token": last.tokens[i]["t"]})
+        return out
 
     @app.get("/api/personas")
     def list_personas():
