@@ -87,6 +87,26 @@
       .replace(/\bPieces\b/g, 'Tokens').replace(/\bpieces\b/g, 'tokens').replace(/\bPiece\b/g, 'Token').replace(/\bpiece\b/g, 'token')
       .replace(/\bBackpack\b/g, 'Context window').replace(/\bbackpack\b/g, 'context window');
   }
-  const api = { setVocab, words, plainText, queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight };
+  // piece 4, layers panel: one chip per layer from the sidecar's response; the final token's tone once a layer agrees with it.
+  function layersModel(resp, wallToken) {
+    if (!resp || !resp.layers) return { chips: [], decided_at: null, agree: null, sibling: null };
+    const fin = resp.final ? resp.final.t : null;
+    const chips = resp.layers.map(l => {
+      const top = (l.top && l.top[0]) || { t: '', p: 0 };
+      const isFinal = top.t === fin;
+      return { n: l.n, t: top.t, p: top.p, tone: isFinal ? tone(top.p) : 'other', isFinal, decided: l.n === resp.decided_at };
+    });
+    const norm = s => String(s == null ? '' : s).trim();
+    return { chips, decided_at: resp.decided_at ?? null, agree: fin == null || wallToken == null ? null : norm(fin) === norm(wallToken), sibling: fin };
+  }
+  // the "where it looked" strip: prompt tokens paired with one attention row (early / decided / late).
+  function attentionHeat(resp, which) {
+    if (!resp || !resp.attention || !resp.attention.length) return { layer: null, cells: [] };
+    const rows = resp.attention;
+    const row = which === 'early' ? rows[0] : which === 'late' ? rows[rows.length - 1]
+      : (rows.find(r => r.layer === resp.decided_at) || rows[rows.length - 1]);
+    return { layer: row.layer, cells: (resp.tokens || []).map((t, i) => ({ t, w: row.weights[i] ?? 0 })) };
+  }
+  const api = { setVocab, words, plainText, queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.peekLib = api;
 })(typeof window !== 'undefined' ? window : globalThis);

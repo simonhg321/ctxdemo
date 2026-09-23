@@ -127,3 +127,24 @@ test('plainText: rewrites our own prose for the plain vocabulary, leaves it alon
   assert.equal(L.plainText('# the backpack', 'plain'), '# the context window');
   assert.equal(L.plainText('Pieces it was sure about · a masterpiece', 'plain'), 'Tokens it was sure about · a masterpiece');   // whole words only
 });
+test('layersModel: chips with tones, the decided marker, and whether the sibling agrees with the wall', () => {
+  const RESP = { tokens: ['<s>', 'Monty', ' Hall', '?'], final: { t: 'Yes', p: 0.9 }, decided_at: 3, n_layers: 4,
+    layers: [{ n: 1, top: [{ t: 'the', p: 0.2 }] }, { n: 2, top: [{ t: 'No', p: 0.4 }] }, { n: 3, top: [{ t: 'Yes', p: 0.6 }] }, { n: 4, top: [{ t: 'Yes', p: 0.9 }] }],
+    attention: [{ layer: 1, weights: [0, 0.2, 1, 0.1] }, { layer: 3, weights: [0, 1, 0.5, 0] }, { layer: 4, weights: [0, 0.1, 0.1, 1] }] };
+  const m = L.layersModel(RESP, 'Yes');
+  assert.equal(m.chips.length, 4); assert.equal(m.decided_at, 3); assert.equal(m.agree, true); assert.equal(m.sibling, 'Yes');
+  assert.deepEqual(m.chips[0], { n: 1, t: 'the', p: 0.2, tone: 'other', isFinal: false, decided: false });
+  assert.deepEqual(m.chips[2], { n: 3, t: 'Yes', p: 0.6, tone: 'unsure', isFinal: true, decided: true });
+  assert.equal(m.chips[3].tone, 'sure');
+  assert.equal(L.layersModel(RESP, ' No').agree, false);
+  assert.deepEqual(L.layersModel(null, 'x'), { chips: [], decided_at: null, agree: null, sibling: null });
+});
+test('attentionHeat: pairs tokens with the chosen attention row', () => {
+  const RESP = { tokens: ['<s>', 'Monty', ' Hall', '?'], final: { t: 'Yes', p: 0.9 }, decided_at: 3, n_layers: 4,
+    layers: [{ n: 1, top: [{ t: 'the', p: 0.2 }] }, { n: 2, top: [{ t: 'No', p: 0.4 }] }, { n: 3, top: [{ t: 'Yes', p: 0.6 }] }, { n: 4, top: [{ t: 'Yes', p: 0.9 }] }],
+    attention: [{ layer: 1, weights: [0, 0.2, 1, 0.1] }, { layer: 3, weights: [0, 1, 0.5, 0] }, { layer: 4, weights: [0, 0.1, 0.1, 1] }] };
+  assert.deepEqual(L.attentionHeat(RESP, 'decided'), { layer: 3, cells: [{ t: '<s>', w: 0 }, { t: 'Monty', w: 1 }, { t: ' Hall', w: 0.5 }, { t: '?', w: 0 }] });
+  assert.equal(L.attentionHeat(RESP, 'early').layer, 1); assert.equal(L.attentionHeat(RESP, 'late').layer, 4);
+  assert.equal(L.attentionHeat({ ...RESP, decided_at: 99 }, 'decided').layer, 4);     // no matching row: the last one
+  assert.deepEqual(L.attentionHeat(null, 'decided'), { layer: null, cells: [] });
+});
