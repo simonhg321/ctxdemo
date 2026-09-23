@@ -117,7 +117,7 @@ test('queueLine: what the ask box says while waiting', () => {
 });
 test('words: wall vocabulary vs plain (tokens / context window)', () => {
   assert.deepEqual(L.words('wall'), { pieces: 'pieces', piece: 'pieces'.slice(0, -1), pack: 'backpack', Pack: 'Backpack', packIcon: '🎒' });
-  assert.deepEqual(L.words('plain'), { pieces: 'tokens', piece: 'token', pack: 'context window', Pack: 'Context window', packIcon: '🪟' });
+  assert.deepEqual(L.words('plain'), { pieces: 'tokens', piece: 'token', pack: 'context window', Pack: 'Context window', packIcon: 'context' });
   assert.equal(L.words(undefined).pieces, 'pieces');
 });
 test('plainText: rewrites our own prose for the plain vocabulary, leaves it alone for the wall', () => {

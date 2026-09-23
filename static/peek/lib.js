@@ -77,7 +77,7 @@
   let vocabMode = 'wall';
   const setVocab = mode => { vocabMode = mode === 'plain' ? 'plain' : 'wall'; };
   const words = mode => ((mode || vocabMode) === 'plain'
-    ? { pieces: 'tokens', piece: 'token', pack: 'context window', Pack: 'Context window', packIcon: '\u{1FA9F}' }
+    ? { pieces: 'tokens', piece: 'token', pack: 'context window', Pack: 'Context window', packIcon: 'context' }
     : { pieces: 'pieces', piece: 'piece', pack: 'backpack', Pack: 'Backpack', packIcon: '\u{1F392}' });
   // our own prose (explain cards, captions) rewritten for the plain vocabulary; whole words only, never user text
   function plainText(text, mode) {
