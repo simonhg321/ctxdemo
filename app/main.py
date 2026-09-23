@@ -12,6 +12,7 @@ from .vllm import VLLM
 from .tools import Tools
 from .chunks import Chunker
 from .turnlog import TurnLog, hesitations
+from .models import Switcher, load_models, host_restarts
 from collections import deque
 from .ears import Ears, split_wake, spoken_command
 from . import grader
@@ -76,7 +77,7 @@ class ListenReq(BaseModel):
     off: bool = False            # the off button: close the window now
 
 
-def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=None, personas=None, netdata_transport=None) -> FastAPI:
+def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=None, personas=None, netdata_transport=None, switcher=None) -> FastAPI:
     cfg = cfg or config.load()
     personas = personas if personas is not None else load_personas()
     if ears is None and cfg.ears_url:
@@ -90,6 +91,17 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     turnlog = TurnLog(cfg.turnlog)
     room: deque = deque(maxlen=60)     # the presenter's live feed: the last turns from every session, newest last
     netdata = httpx.Client(base_url=cfg.netdata_url.rstrip("/"), timeout=3, transport=netdata_transport) if cfg.netdata_url else None
+    if hasattr(vllm, "refresh_model"):
+        vllm.refresh_model()                          # the served name may differ from config (the model switch changes it)
+    if switcher is None and cfg.compose_dir and cfg.admin_password:
+        def switched(m):                              # vLLM is back on the new model: use its name and its tokenizer
+            if hasattr(vllm, "refresh_model"): vllm.refresh_model()
+            if hasattr(chunker, "use"): chunker.use(m.get("tokenizer"))
+        switcher = Switcher(load_models(), env_file=Path(cfg.compose_dir) / ".env", compose_dir=Path(cfg.compose_dir),
+                            hub_dir=Path(cfg.hf_hub_dir or "/nonexistent"), password=cfg.admin_password, runner=host_restarts,
+                            wait_healthy=lambda: vllm.wait_healthy() if hasattr(vllm, "wait_healthy") else True, on_switched=switched)
+    switcher = switcher or Switcher(models=[], env_file=Path("/nonexistent/.env"), compose_dir=Path("/nonexistent"), hub_dir=Path("/nonexistent"), password="")
+    current_model = lambda: getattr(vllm, "model", cfg.model)
     scr = script_mod.load()
     app = FastAPI(title="ctxdemo")
     app.mount("/static", StaticFiles(directory=str(ROOT / "static")), name="static")
@@ -120,8 +132,9 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
 
     @app.get("/api/health")
     def health(request: Request):
-        return {"vllm": "ok" if vllm.health() else "down", "model": cfg.model, "window_tokens": cfg.window_tokens,
-                "audience": is_audience(request), "room": cfg.room,
+        return {"vllm": "ok" if vllm.health() else "down", "model": current_model(), "window_tokens": cfg.window_tokens,
+                "audience": is_audience(request), "room": cfg.room, "switching": switcher.switching,
+                "tools_ok": (switcher.info(current_model()) or {"tools": True})["tools"],
                 "vision": "ok" if vision.health() else "down", "vision_model": getattr(vision, "model", cfg.model),
                 "exact_counts": getattr(vllm, "exact", True), "board_window": cfg.board_window,
                 "ears": ("ok" if ears.health() else "down") if ears else "none", "listen_seconds": cfg.listen_seconds,
@@ -132,6 +145,26 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     def queue():
         """How busy the shared GPU is right now, for the ask box's waiting line."""
         return {"queue": vllm.queue() if hasattr(vllm, "queue") else None}
+
+    @app.get("/api/models")
+    def models():
+        """The switch list: what is running, what can be picked, what is already downloaded, whether a switch is in flight."""
+        return switcher.status(current=current_model())
+
+    class ModelReq(BaseModel):
+        id: str
+        password: str = ""
+
+    @app.post("/api/model")
+    def set_model(req: ModelReq = Body(...)):
+        try:
+            return switcher.switch(req.id, req.password)
+        except PermissionError:
+            raise HTTPException(403, "wrong password")
+        except ValueError:
+            raise HTTPException(400, "not in the list")
+        except RuntimeError as e:
+            raise HTTPException(409, str(e))
 
     @app.get("/api/gpu")
     def gpu():

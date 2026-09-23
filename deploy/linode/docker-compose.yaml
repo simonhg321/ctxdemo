@@ -19,15 +19,16 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    # MODEL / MODEL_ARGS come from .env in this directory (written by 03-stack.sh; rewritten by the wall's model switch,
+    # which the HOST applies via a systemd path unit — the container never touches docker).
+    # No --served-model-name: the served id is the repo id, and ctxdemo learns it from /v1/models.
     command: >
-      Qwen/Qwen3-8B-FP8
-      --served-model-name qwen3-8b
+      ${MODEL:-Qwen/Qwen3-8B-FP8}
       --gpu-memory-utilization 0.90
       --kv-cache-dtype fp8
       --max-model-len 32768
       --max-num-seqs 16
-      --enable-auto-tool-choice --tool-call-parser hermes
-      --reasoning-parser qwen3
+      ${MODEL_ARGS:---reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://127.0.0.1:8000/health"]
       interval: 15s
@@ -45,9 +46,14 @@ services:
       - CTXDEMO_TURNLOG=/srv/data/logs/turns.jsonl    # on for the talk (said on the slide; first names optional)
       - CTXDEMO_ROOM=1                                 # optional first-name box -> the room feed
       - NETDATA_URL=http://host.docker.internal:19999  # GPU busy % tile (Netdata on the host)
+      - CTXDEMO_ADMIN_PASSWORD=${CTXDEMO_ADMIN_PASSWORD:-}   # the model switch (from .env; empty = switching off)
+      - CTXDEMO_COMPOSE_DIR=/srv/compose                     # where .env lives inside the container
+      - CTXDEMO_HF_HUB=/srv/data/hf/hub
       # - CTXDEMO_AUDIENCE=1                           # put back to clamp plain visitors (4k / 600 tokens / no web); /presenter/ keeps the full set
     volumes:
       - /srv/data/logs:/srv/data/logs
+      - /srv/projects/ctxdemo/deploy/linode:/srv/compose      # the model switch writes .env here; the host's path unit does the restart
+      - /srv/data/hf/hub:/srv/data/hf/hub:ro                # to flag which models are already downloaded
     extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:
       vllm: { condition: service_healthy }

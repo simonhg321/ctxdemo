@@ -5,7 +5,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 ENV HF_HOME=/srv/hf
 ENV CTXDEMO_TOKENIZER=$CTXDEMO_TOKENIZER
-RUN python -c "import os; from tokenizers import Tokenizer; Tokenizer.from_pretrained(os.environ['CTXDEMO_TOKENIZER'])" || echo "tokenizer prefetch failed; chunks strip will be hidden"
+COPY config/models.json /tmp/models.json
+RUN python -c "import os, json; from tokenizers import Tokenizer; \
+  repos = {os.environ['CTXDEMO_TOKENIZER']} | {m['tokenizer'] for m in json.load(open('/tmp/models.json'))['models']}; \
+  [Tokenizer.from_pretrained(r) for r in sorted(repos)]" || echo "tokenizer prefetch failed; chunks strip will be hidden for some models"
 COPY app app
 COPY config config
 COPY corpus corpus

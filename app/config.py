@@ -31,6 +31,9 @@ class Config:
     audience: bool = False               # NFCU Linode: clamp sessions without an X-Presenter header (4k window, 600-token leash, no tools)
     room: bool = False                   # NFCU: show the optional first-name box (feeds the presenter's room panel)
     netdata_url: str = ""                # NFCU: Netdata agent for /api/gpu (GPU busy % in the tiles); empty = no tile
+    admin_password: str = ""             # NFCU: password for the model switch; empty = switching disabled
+    compose_dir: str = ""                # NFCU: where docker-compose.yaml + .env live (mounted into the container); empty = disabled
+    hf_hub_dir: str = ""                 # NFCU: the vLLM model cache (…/hub) to flag which models are already downloaded
     prices: dict[str, dict[str, float]] = field(default_factory=dict)
 
 
@@ -48,6 +51,9 @@ def load(root: Path = ROOT) -> Config:
     demo["audience"] = os.environ.get("CTXDEMO_AUDIENCE") == "1"
     demo["room"] = os.environ.get("CTXDEMO_ROOM") == "1"
     demo["netdata_url"] = os.environ.get("NETDATA_URL", "")
+    demo["admin_password"] = os.environ.get("CTXDEMO_ADMIN_PASSWORD", "")
+    demo["compose_dir"] = os.environ.get("CTXDEMO_COMPOSE_DIR", "")
+    demo["hf_hub_dir"] = os.environ.get("CTXDEMO_HF_HUB", "")
     url = os.environ.get("VLLM_URL", "http://127.0.0.1:8100")
     return Config(vllm_url=url, vision_url=os.environ.get("VISION_URL", url),
                   vision_model=os.environ.get("VISION_MODEL", demo["model"]), ears_url=os.environ.get("EARS_URL", ""),

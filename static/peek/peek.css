@@ -79,3 +79,10 @@ mark { background: rgba(242,169,59,.35); color: var(--bone); border-radius: .2em
 #panel.room .room-q { margin-top: .2em; }
 #panel.room .room-a { font-size: .85em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #panel.room .room-sure.sure { color: var(--moss); } #panel.room .room-sure.unsure { color: var(--amber); } #panel.room .room-sure.flip { color: var(--red); }
+
+/* the model tile */
+.tile.model .big { cursor: pointer; font-size: 1.4em; }
+.tile.model.switching .big { color: var(--ice); }
+.tile.model #model-sub { font-size: .7em; }
+.tile.model #model-pick { display: flex; gap: .4em; flex-wrap: wrap; margin-top: .4em; font-size: .75em; }
+.tile.model select, .tile.model input[type=password] { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: .25em; padding: .3em .5em; }

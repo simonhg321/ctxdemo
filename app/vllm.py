@@ -99,6 +99,27 @@ class VLLM:
         except httpx.HTTPError:
             return False
 
+    def refresh_model(self) -> str | None:
+        """Ask the server which model it serves (vLLM lists exactly one) and use that name from now on."""
+        try:
+            r = self._c.get("/v1/models", timeout=5)
+            r.raise_for_status()
+            ids = [d.get("id") for d in (r.json().get("data") or []) if d.get("id")]
+            if ids:
+                self.model = ids[0]
+            return self.model
+        except (httpx.HTTPError, ValueError):
+            return None
+
+    def wait_healthy(self, timeout: float = 900, every: float = 3.0) -> bool:
+        """Block until the server answers /health (and lists a model) or the timeout passes."""
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            if self.health() and self.refresh_model():
+                return True
+            time.sleep(every)
+        return False
+
     def queue(self) -> dict | None:
         """vLLM's Prometheus /metrics -> {running, waiting, kv_pct}. None when the server has none (Ollama) or it fails."""
         try:

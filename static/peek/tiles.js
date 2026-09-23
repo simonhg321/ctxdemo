@@ -26,11 +26,60 @@ peekPanels.tiles = (function () {
   async function pollGpu() {
     try { const g = (await (await fetch('../../api/gpu')).json()).gpu; gpuTile(g ? g.busy : null); } catch (e) { /* keep the last number */ }
   }
+  // the model tile: which model is answering, and (with the admin password) a switch to another from config/models.json.
+  // A switch restarts vLLM (~1 min when the weights are cached); the tile counts, and the driver disables Ask meanwhile.
+  let models = null, pickOpen = false;
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function modelTile() {
+    if (!models) return;
+    let t = el.querySelector('#model-tile');
+    if (!t) {
+      t = document.createElement('div'); t.className = 'tile model'; t.id = 'model-tile';
+      t.innerHTML = '<div class="cap">the model</div><div class="big" id="model-big"></div><div id="model-sub" class="dim"></div><div id="model-pick" style="display:none"></div>';
+      el.appendChild(t);
+      t.querySelector('#model-big').onclick = () => { if (models.enabled && !models.switching) { pickOpen = !pickOpen; modelTile(); } };
+    }
+    const cur = (models.models || []).find(m => m.current) || { label: models.current || '—', note: '' };
+    const sw = models.switching;
+    if (sw) {
+      const target = (models.models || []).find(m => m.id === sw.target) || { label: sw.target };
+      const secs = Math.max(0, Math.round(Date.now() / 1000 - sw.since));
+      t.querySelector('#model-big').textContent = 'switching → ' + target.label;
+      t.querySelector('#model-sub').textContent = `restarting the model server · ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')} · usually about a minute`;
+      pickOpen = false;
+    } else {
+      t.querySelector('#model-big').textContent = cur.label;
+      t.querySelector('#model-sub').textContent = models.error ? 'last switch failed: ' + models.error : (cur.note || '') + (models.enabled ? ' · tap to switch' : '');
+    }
+    t.classList.toggle('switching', !!sw);
+    const pick = t.querySelector('#model-pick');
+    pick.style.display = pickOpen ? '' : 'none';
+    if (pickOpen && !pick.innerHTML) {
+      pick.innerHTML = '<select id="model-sel">' + models.models.map(m =>
+        `<option value="${esc(m.id)}"${m.current ? ' selected' : ''}>${esc(m.label)} — ${esc(m.note)}${m.cached ? '' : ' (not downloaded: slow)'}</option>`).join('') +
+        '</select><input type="password" id="model-pw" placeholder="password" autocomplete="off"><button type="button" id="model-go">Switch</button><span id="model-msg" class="dim"></span>';
+      pick.querySelector('#model-go').onclick = async () => {
+        const id = pick.querySelector('#model-sel').value, pw = pick.querySelector('#model-pw').value;
+        const r = await fetch('../../api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, password: pw }) });
+        if (!r.ok) { pick.querySelector('#model-msg').textContent = (await r.json().catch(() => ({}))).detail || r.statusText; return; }
+        pick.querySelector('#model-pw').value = ''; pickOpen = false; pollModels();
+      };
+    }
+  }
+  async function pollModels() {
+    try {
+      const j = await (await fetch('../../api/models')).json();
+      const was = models && models.switching, now = j.switching;
+      models = j; modelTile();
+      if (now || was) peekBus.send('model', { switching: now, current: j.current });      // ticking while switching, and one final "done"
+    } catch (e) { /* keep the last state */ }
+  }
   return {
     mount(root) {
       el = root;
       el.classList.add('row');
       pollGpu(); setInterval(pollGpu, 2000);
+      pollModels(); setInterval(pollModels, 3000);
       el.innerHTML = ['sure', 'worst', 'pack'].map(k => `<div class="tile"><div class="cap" id="${k}-cap"></div><div class="big" id="${k}-big">—</div></div>`).join('');
       el.querySelector('#sure-cap').textContent = 'pieces it was sure about';
       el.querySelector('#worst-cap').textContent = 'biggest hesitation';

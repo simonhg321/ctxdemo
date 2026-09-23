@@ -385,3 +385,26 @@ def test_room_flag_and_gpu_endpoint(fake, cfg, monkeypatch):
     from app.config import load
     monkeypatch.setenv("CTXDEMO_ROOM", "1"); monkeypatch.setenv("NETDATA_URL", "http://x:19999")
     l = load(); assert l.room is True and l.netdata_url == "http://x:19999"
+
+
+def test_model_endpoints(fake, cfg, tmp_path):
+    from dataclasses import replace
+    from app.models import Switcher
+    calls = []
+    sw = Switcher(models=[{"id": "fake", "label": "Fake", "note": "", "args": "", "tools": True, "tokenizer": "x"},
+                          {"id": "other", "label": "Other", "note": "", "args": "--y", "tools": False, "tokenizer": "y"}],
+                  env_file=tmp_path / ".env", compose_dir=tmp_path, hub_dir=tmp_path, password="pw",
+                  runner=lambda cmd, cwd: calls.append(cmd) or 0, wait_healthy=lambda: True, on_switched=lambda m: None)
+    c = TestClient(create_app(vllm=fake, cfg=cfg, switcher=sw))
+    j = c.get("/api/models").json()
+    assert j["current"] == "fake" and j["switching"] is None and [m["id"] for m in j["models"]] == ["fake", "other"]
+    assert c.get("/api/health").json()["switching"] is None
+    assert c.post("/api/model", json={"id": "other", "password": "nope"}).status_code == 403
+    assert c.post("/api/model", json={"id": "zzz", "password": "pw"}).status_code == 400
+    r = c.post("/api/model", json={"id": "other", "password": "pw"})
+    assert r.status_code == 200 and r.json()["switching"]["target"] == "other"
+    sw.join(5)
+    assert calls and calls[0][:2] == ["docker", "compose"]
+    assert c.get("/static/peek/tiles.js").text.count("api/models") >= 1
+    plain = TestClient(create_app(vllm=fake, cfg=cfg))                 # no switcher configured: read-only list, switch disabled
+    assert plain.get("/api/models").json()["models"] == [] and plain.post("/api/model", json={"id": "x", "password": "p"}).status_code == 403

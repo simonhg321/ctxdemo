@@ -18,6 +18,12 @@ class Chunker:
         self._tok = None
         self.available = bool(self.repo)
 
+    def use(self, repo: str | None) -> None:
+        """Switch to another model's tokenizer (the model switch); loads lazily on the next split."""
+        self.repo = repo or ""
+        self._tok = None
+        self.available = bool(self.repo)
+
     def split(self, text: str) -> list[str]:
         if not self.available or not text:
             return []

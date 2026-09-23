@@ -28,8 +28,16 @@ printf '%s %s\n' "$PUSER_" "$PHASH" > /srv/data/caddy/htpasswd-presenter
 chmod 600 /srv/data/caddy/htpasswd /srv/data/caddy/htpasswd-presenter
 echo "== htpasswd: audience $USER_ · presenter $PUSER_"
 
-# 3. Up. vLLM pulls the model on first start (~8.7 GB) — ctxdemo waits for its healthcheck.
+# 3. .env for compose: the model vLLM starts with (the wall's switch rewrites MODEL/MODEL_ARGS) + the switch password.
 cd $DEST/deploy/linode
+if [ ! -f .env ]; then
+  printf 'MODEL=Qwen/Qwen3-8B-FP8\nMODEL_ARGS=--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes\n' > .env
+fi
+grep -q '^CTXDEMO_ADMIN_PASSWORD=' .env || printf 'CTXDEMO_ADMIN_PASSWORD=%s\n' "$PPASS_" >> .env
+chmod 600 .env
+echo "== .env: $(grep ^MODEL= .env) · switch password = the presenter password"
+
+# 4. Up. vLLM pulls the model on first start (~8.7 GB) — ctxdemo waits for its healthcheck.
 docker compose pull -q vllm caddy
 docker compose up -d --build 2>&1 | grep -E "Started|Created|Error|error" | sed 's/^/   /'
 echo "== waiting for vLLM (first start downloads the model; a few minutes)"
