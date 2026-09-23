@@ -20,7 +20,7 @@
   const personaModel = (personas, activeId) => (personas || []).map(p => ({ ...p, active: p.id === activeId }));
   // what to add to the /api/session body for the currently-picked persona: an id, or free text for "custom".
   // Personas get a long leash (10,000 pieces vs the wall's 400): "show your steps" and custom prompts ask for long answers.
-  const personaSessionFields = persona => (!persona ? {} : Object.assign({ max_tokens: 10000 }, persona.id === 'custom' ? { system: persona.prompt } : { persona: persona.id }));
+  const personaSessionFields = persona => Object.assign({ max_tokens: 10000 }, !persona ? {} : persona.id === 'custom' ? { system: persona.prompt } : { persona: persona.id });
   // act 6, explain bar: parse our tiny markdown subset (paragraphs, `- ` lists, and the <!-- personas --> placeholder).
   function explainParse(mdText) {
     const lines = String(mdText || '').replace(/\r\n/g, '\n').split('\n');
