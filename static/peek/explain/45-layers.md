@@ -1,5 +1,5 @@
 # inside the head
-The model is a stack of **layers** — 36 of them in the sibling this wall reads. Each layer takes the running guess about the next piece and rewrites it a little. Read the guess out after every layer and you can watch an answer form: nothing, then a vague word, then the right word getting surer, then locked in.
+The model is a stack of **layers** — a few dozen in the sibling this wall reads. Each layer takes the running guess about the next piece and rewrites it a little. Read the guess out after every layer and you can watch an answer form: nothing, then a vague word, then the right word getting surer, then locked in.
 
 - **the column** — one chip per layer, bottom to top. The chip shows that layer's best guess and how sure it was. Chips turn the answer's colour once they agree with the final word.
 - **decided here** — the first layer after which the guess never changes again. Early = the model "knew"; late = it was still arguing with itself.

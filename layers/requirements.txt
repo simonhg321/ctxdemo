@@ -1,5 +1,5 @@
 fastapi>=0.115
 uvicorn[standard]>=0.30
 transformer_lens>=3.9,<4
-transformers>=4.51
+transformers>=5.9,<6
 accelerate>=1.0

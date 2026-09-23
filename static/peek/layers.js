@@ -1,20 +1,22 @@
 // "Inside the head": how one token of the answer formed, layer by layer, in a 4B sibling of the wall's model.
 // Asks /api/layers for the first token after every turn, and for any token tapped in the answer (bus `select`).
 peekPanels.layers = (function () {
-  let el, sid = null, toks = [], busy = false, which = 'decided', last = null;
+  let el, sid = null, toks = [], busy = false, which = 'decided', last = null, cache = {}, pending = null;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const vis = t => String(t).replace(/^Ġ| /g, '␣').replace(/\n/g, '⏎').replace(/^<\|.*\|>$/, '·');
+  const vis = t => String(t).replace(/^(Ġ| )/, '␣').replace(/\n/g, '⏎').replace(/^<\|.*\|>$/, '·');
   function draw(resp, index) {
+    index = resp.index;
     const W = peekLib.words();
-    const m = peekLib.layersModel(resp, toks[index] ? toks[index].t : null);
-    el.querySelector('#how').textContent = index ? `how it chose “${toks[index].t.trim()}”` : 'how it chose the first ' + W.piece;
+    const wallToken = resp.wall_token != null ? resp.wall_token : (toks[index] ? toks[index].t : null);
+    const m = peekLib.layersModel(resp, wallToken);
+    el.querySelector('#how').textContent = index ? `how it chose “${String(wallToken).trim()}”` : 'how it chose the first ' + W.piece;
     const col = el.querySelector('#col');
     col.innerHTML = m.chips.slice().reverse().map(c =>
-      `<div class="lchip ${c.tone}${c.decided ? ' decided' : ''}" title="layer ${c.n}: ${esc(c.t)} ${peekLib.pct(c.p)}">` +
+      `<div class="lchip ${c.tone}${c.decided ? ' decided' : ''}" title="layer ${esc(c.n)}: ${esc(c.t)} ${peekLib.pct(c.p)}">` +
       `<span class="ln">${c.n}</span><span class="lt">${esc(vis(c.t))}</span><span class="lp">${peekLib.pct(c.p)}</span>` +
       (c.decided ? '<span class="ldec">decided here</span>' : '') + '</div>').join('');
     const verdict = el.querySelector('#verdict');
-    if (m.agree === false) verdict.innerHTML = `the wall said <b>${esc(toks[index].t.trim())}</b> · the sibling would have said <b>${esc(String(m.sibling).trim())}</b>`;
+    if (m.agree === false) verdict.innerHTML = `the wall said <b>${esc(String(wallToken).trim())}</b> · the sibling would have said <b>${esc(String(m.sibling).trim())}</b>`;
     else if (m.agree === true) verdict.innerHTML = `both say <b>${esc(String(m.sibling).trim())}</b>`;
     else verdict.textContent = '';
     const h = peekLib.attentionHeat(resp, which);
@@ -24,15 +26,22 @@ peekPanels.layers = (function () {
     peekBus.send('layers', { index, decided_at: m.decided_at, agree: m.agree });
   }
   async function ask(index) {
-    if (!sid || !toks.length || busy) return;
+    if (!sid) { el.querySelector('#state').textContent = 'no session on this wall (open it from the wall, not replay)'; return; }
+    if (!toks.length) return;
+    if (cache[index]) { draw(cache[index], index); return; }
+    if (busy) { pending = index; return; }
     busy = true; el.querySelector('#state').textContent = 'reading the layers…';
     try {
       const r = await fetch('../../api/layers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: sid, index }) });   // relative: /demo/ prefix
       if (r.status === 503) { el.querySelector('#state').textContent = 'layers are off on this wall'; return; }
       if (!r.ok) { el.querySelector('#state').textContent = 'layers: ' + ((await r.json().catch(() => ({}))).detail || r.statusText); return; }
-      last = await r.json(); el.querySelector('#state').textContent = ''; draw(last, index);
+      last = await r.json(); cache[index] = last; el.querySelector('#state').textContent = ''; draw(last, index);
     } catch (e) { el.querySelector('#state').textContent = 'layers: ' + e.message; }
-    finally { busy = false; }
+    finally {
+      busy = false;
+      if (pending !== null && pending !== index) { const p = pending; pending = null; ask(p); }
+      else pending = null;
+    }
   }
   return {
     mount(root) {
@@ -41,11 +50,13 @@ peekPanels.layers = (function () {
         '<div class="dim" style="font-size:.75em">a 4B sibling of the model you are talking to, read layer by layer · <span id="verdict"></span></div>' +
         '<div id="state" class="dim">ask something…</div>' +
         '<div class="lbody"><div id="col" class="lcol"></div><div class="lheat"><div class="cap"><span id="heatcap">where it looked</span> ' +
-        '<button type="button" id="hw" class="linkish">early / decided / late</button></div><div id="heat"></div></div></div>';
-      el.querySelector('#hw').onclick = () => { which = { decided: 'early', early: 'late', late: 'decided' }[which]; if (last) draw(last, last.index); };
+        '<button type="button" id="hw" class="linkish">early | decided | late</button></div><div id="heat"></div></div></div>';
+      const hw = () => { el.querySelector('#hw').textContent = 'early | decided | late'.replace(which, '[' + which + ']'); };
+      hw();
+      el.querySelector('#hw').onclick = () => { which = { decided: 'early', early: 'late', late: 'decided' }[which]; hw(); if (last) draw(last, last.index); };
     },
     onTurn(msg) {
-      sid = (msg && msg.session_id) || sid; toks = (msg && msg.turn && msg.turn.tokens) || []; last = null;
+      sid = (msg && msg.session_id) || sid; toks = (msg && msg.turn && msg.turn.tokens) || []; last = null; cache = {}; pending = null;
       el.querySelector('#col').innerHTML = ''; el.querySelector('#heat').innerHTML = ''; el.querySelector('#verdict').textContent = '';
       if (!toks.length) { el.querySelector('#state').textContent = 'ask something…'; return; }
       ask(0);                                                  // the anchor: how the first token of the answer formed

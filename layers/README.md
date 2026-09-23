@@ -10,3 +10,4 @@ looked (attention, heads averaged, sink dropped). Spec: `../docs/specs/2026-09-2
   `{tokens, final:{t,p}, layers:[{n, top:[{t,p}]}], decided_at, attention:[{layer, weights}], cut, model, n_layers, seconds}`.
 - Tests (no GPU): `python -m pytest layers/tests -q` from the repo root.
 - VRAM: ~8 GB for the 4B in bf16 + activations. Stop it (`docker compose down`) to hand the memory back.
+- Resolved set on the spike box: transformer-lens 3.9.0, transformers 5.17.0, torch 2.8.0+cu128.

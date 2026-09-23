@@ -84,13 +84,13 @@ class TimingEngine:
         self.model_name = "timing/model"
         self.n_layers = 1
         self.device = "cpu"
-        self.start_time = None
-        self.end_time = None
+        self.calls = []
 
     def analyze(self, messages, prompt, prefix, top_k, max_tokens):
-        self.start_time = time.time()
+        start = time.time()
         time.sleep(0.2)
-        self.end_time = time.time()
+        end = time.time()
+        self.calls.append((start, end))
         return {"final": {"t": "ok", "p": 1.0}, "decided_at": 0, "layers": []}
 
 
@@ -99,21 +99,17 @@ async def test_serialisation():
     engine = TimingEngine()
     app = create_app(engine)
 
-    timings = {}
-
-    async def make_request(request_id):
+    async def make_request():
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),
             base_url="http://test"
         ) as client:
             r = await client.post("/layers", json={"messages": [{"role": "user", "content": "hi"}]})
             assert r.status_code == 200
-            # Record timing from the engine's perspective
-            timings[request_id] = (engine.start_time, engine.end_time)
 
-    await asyncio.gather(make_request(1), make_request(2))
+    await asyncio.gather(make_request(), make_request())
 
     # Assert requests ran sequentially: second start >= first end
-    start1, end1 = timings[1]
-    start2, end2 = timings[2]
-    assert start2 >= end1, f"Requests overlapped: {end1} > {start2}"
+    calls = sorted(engine.calls)
+    assert len(calls) == 2
+    assert calls[1][0] >= calls[0][1], f"Requests overlapped: {calls[0][1]} > {calls[1][0]}"

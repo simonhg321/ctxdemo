@@ -487,3 +487,5 @@ def test_layers_panel_chip_and_wall_slot_are_served(client):
     js = client.get("/static/peek/layers.js").text
     assert "api/layers" in js and "peekLib.layersModel(" in js and "peekLib.words(" in js and "fetch('/" not in js
     assert "&quot;" in js
+    assert "cache[" in js or "cache =" in js
+    assert "wall_token" in js
