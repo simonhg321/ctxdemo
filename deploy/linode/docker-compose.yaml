@@ -43,9 +43,12 @@ services:
       - VLLM_URL=http://vllm:8000
       - HF_HUB_OFFLINE=1
       - CTXDEMO_TURNLOG=/srv/data/logs/turns.jsonl    # on for the talk (said on the slide; first names optional)
-      - CTXDEMO_AUDIENCE=1                             # clamp sessions unless Caddy's /presenter/ route added X-Presenter
+      - CTXDEMO_ROOM=1                                 # optional first-name box -> the room feed
+      - NETDATA_URL=http://host.docker.internal:19999  # GPU busy % tile (Netdata on the host)
+      # - CTXDEMO_AUDIENCE=1                           # put back to clamp plain visitors (4k / 600 tokens / no web); /presenter/ keeps the full set
     volumes:
       - /srv/data/logs:/srv/data/logs
+    extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:
       vllm: { condition: service_healthy }
 
@@ -55,6 +58,7 @@ services:
     restart: unless-stopped
     ports: ["80:80", "443:443", "443:443/udp"]
     command: ["caddy", "run", "--config", "/etc/caddy/conf/Caddyfile", "--adapter", "caddyfile"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
     volumes:
       - ./:/etc/caddy/conf:ro                          # the DIRECTORY, not the file: git pull replaces the inode and a file mount would keep the old one
       - /srv/data/caddy:/etc/caddy/auth:ro             # htpasswd + htpasswd-presenter

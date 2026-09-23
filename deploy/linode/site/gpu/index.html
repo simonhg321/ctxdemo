@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RTX 4000 Ada — demo.instockornot.club</title>
+<style>
+  :root {
+    --ground: #0f1216;
+    --panel: #171c22;
+    --line: #262d36;
+    --bone: #e6e1d6;
+    --dim: #6b7480;
+    --amber: #f2a93b;
+    --amber-deep: #9a5f10;
+    --ice: #7fc8e8;
+    --ice-deep: #2b6c86;
+    --red: #e0553c;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--ground); color: var(--bone); }
+  body {
+    font: 15px/1.45 "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+  }
+  a { color: inherit; }
+
+  header {
+    display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: baseline;
+    padding: 18px 28px 0;
+  }
+  header .host { font-size: 18px; font-weight: 600; letter-spacing: -0.01em; }
+  header .meta { color: var(--dim); }
+  header .meta b { color: var(--bone); font-weight: 500; }
+  header .live { margin-left: auto; color: var(--dim); display: flex; align-items: center; gap: 8px; }
+  header .live i { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); display: inline-block; }
+  header .live.stale i { background: var(--red); }
+
+  main {
+    display: grid;
+    grid-template-columns: minmax(300px, 46vh) 1fr;
+    gap: 24px 48px;
+    padding: 12px 28px 8px;
+    align-items: center;
+  }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+
+  /* the meter */
+  .meter { position: relative; width: 100%; aspect-ratio: 1; }
+  .meter svg { width: 100%; height: 100%; display: block; }
+  .meter .arc-bg { fill: none; stroke: var(--line); stroke-width: 14; }
+  .meter .arc { fill: none; stroke: var(--amber); stroke-width: 14; stroke-linecap: butt;
+                transition: stroke-dashoffset 600ms cubic-bezier(.2,.7,.2,1), stroke 600ms; }
+  .meter .tick { stroke: var(--dim); stroke-width: 2; }
+  .meter .tick.major { stroke: var(--bone); stroke-width: 3; }
+  .meter .readout { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .meter .readout .n { font-size: clamp(64px, 11vh, 120px); font-weight: 200; line-height: 1; letter-spacing: -0.04em; }
+  .meter .readout .n small { font-size: 0.32em; font-weight: 300; color: var(--dim); margin-left: 4px; }
+  .meter .readout .what { color: var(--dim); margin-top: 6px; }
+
+  /* the right-hand instruments */
+  .panel { display: grid; gap: 26px; max-width: 640px; }
+  .row { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; }
+  .row .k { color: var(--dim); }
+  .row .v { font-size: 22px; font-weight: 300; letter-spacing: -0.02em; }
+  .row .v small { font-size: 14px; color: var(--dim); margin-left: 6px; }
+  .bar { height: 12px; background: var(--line); border-radius: 2px; overflow: hidden; display: flex; margin-top: 8px; }
+  .bar b { display: block; height: 100%; transition: width 600ms cubic-bezier(.2,.7,.2,1); }
+  .bar .used { background: var(--ice); }
+  .bar .rsv  { background: var(--ice-deep); }
+  .bar .pwr  { background: var(--amber); }
+  .sub { color: var(--dim); font-size: 13px; margin-top: 6px; display: flex; gap: 18px; flex-wrap: wrap; }
+  .sub i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; vertical-align: -1px; margin-right: 5px; }
+
+  /* strip chart */
+  footer { padding: 4px 28px 22px; border-top: 1px solid var(--line); margin-top: 8px; }
+  footer .cap { display: flex; gap: 22px; color: var(--dim); font-size: 13px; padding: 12px 0 6px; }
+  footer .cap i { display: inline-block; width: 18px; height: 3px; vertical-align: 3px; margin-right: 6px; }
+  footer .cap label { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  footer .cap input[type=range] { width: 160px; accent-color: var(--amber); }
+  canvas { width: 100%; height: 150px; display: block; }
+
+  /* busy over time */
+  .busy { padding: 6px 28px 10px; border-top: 1px solid var(--line); margin-top: 8px; }
+  .busy .cap { color: var(--dim); font-size: 13px; padding: 12px 0 8px; }
+  .busy .cells { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px 24px; }
+  .busy .w { color: var(--dim); font-size: 13px; }
+  .busy .w em { font-style: normal; color: var(--amber-deep); }
+  .busy .p { font-size: 26px; font-weight: 300; letter-spacing: -0.02em; }
+  .busy .p small { font-size: 13px; color: var(--dim); margin-left: 4px; }
+  .busy .d { color: var(--dim); font-size: 13px; }
+  .err { color: var(--red); padding: 8px 28px; display: none; }
+  .err.on { display: block; }
+  @media (prefers-reduced-motion: reduce) { .meter .arc, .bar b { transition: none; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="host">demo.instockornot.club</div>
+  <div class="meta">NVIDIA RTX 4000 Ada <b>20 GB</b> · Linode, Seattle</div>
+  <div class="meta">graphics clock <b id="clk">–</b> MHz</div>
+  <div class="meta">state <b id="pst">–</b></div>
+  <div class="meta">people answering <b id="who">–</b></div>
+  <div class="live" id="live"><i></i><span id="clock">–</span></div>
+</header>
+
+<div class="err" id="err">Can't reach Netdata at /monitor/. Is the agent running on the box?</div>
+
+<main>
+  <div class="meter">
+    <svg viewBox="0 0 200 200" aria-hidden="true">
+      <g id="ticks"></g>
+      <path class="arc-bg" id="arcbg"></path>
+      <path class="arc" id="arc"></path>
+    </svg>
+    <div class="readout">
+      <div class="n"><span id="util">–</span><small>%</small></div>
+      <div class="what">GPU busy</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <div class="k">memory</div>
+      <div>
+        <div class="v"><span id="memused">–</span><small>of 20 GB</small></div>
+        <div class="bar"><b class="used" id="bar-used" style="width:0"></b><b class="rsv" id="bar-rsv" style="width:0"></b></div>
+        <div class="sub"><span><i style="background:var(--ice)"></i>in use</span><span><i style="background:var(--ice-deep)"></i>reserved by driver</span><span id="memfree"></span></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="k">power</div>
+      <div>
+        <div class="v"><span id="pwr">–</span><small>of 130 W</small></div>
+        <div class="bar"><b class="pwr" id="bar-pwr" style="width:0"></b></div>
+      </div>
+    </div>
+    <div class="row">
+      <div class="k">temperature</div>
+      <div class="v"><span id="temp">–</span><small>°C</small></div>
+    </div>
+    <div class="row">
+      <div class="k">memory bus</div>
+      <div class="v"><span id="membusy">–</span><small>% of time busy</small></div>
+    </div>
+    <div class="row">
+      <div class="k">PCIe</div>
+      <div class="v"><span id="pcie">–</span><small>MB/s in + out</small></div>
+    </div>
+  </div>
+</main>
+
+<section class="busy">
+  <div class="cap">GPU busy over time · average utilization, GPU-hours of work, energy · <span id="busy-note"></span></div>
+  <div class="cells" id="busy-cells"></div>
+</section>
+<footer>
+  <div class="cap"><span><i style="background:var(--amber)"></i>GPU busy, <span id="span-label">last 10 minutes</span></span><span><i style="background:var(--ice)"></i>power draw</span><span id="range"></span><label>window <input type="range" id="span" min="0" max="4" step="1" value="0" aria-label="chart window"></label></div>
+  <canvas id="strip" height="150"></canvas>
+</footer>
+
+<script>
+(() => {
+  const API = '/monitor/api/v1/data';
+  const $ = id => document.getElementById(id);
+
+  // ---- meter geometry: 270° arc, opening at the bottom, ticks every 10, majors every 50
+  const cx = 100, cy = 100, r = 84, start = 135, sweep = 270;
+  const pol = (deg, rad) => [cx + rad * Math.cos(deg * Math.PI / 180), cy + rad * Math.sin(deg * Math.PI / 180)];
+  const arcPath = (a0, a1) => { const [x0, y0] = pol(a0, r), [x1, y1] = pol(a1, r);
+    return `M ${x0} ${y0} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1} ${y1}`; };
+  $('arcbg').setAttribute('d', arcPath(start, start + sweep));
+  $('arc').setAttribute('d', arcPath(start, start + sweep));
+  const L = $('arc').getTotalLength();
+  $('arc').style.strokeDasharray = L; $('arc').style.strokeDashoffset = L;
+  let ticks = '';
+  for (let p = 0; p <= 100; p += 10) {
+    const a = start + sweep * p / 100, major = p % 50 === 0;
+    const [x0, y0] = pol(a, r - 13), [x1, y1] = pol(a, r - (major ? 22 : 18));
+    ticks += `<line class="tick${major ? ' major' : ''}" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}"/>`;
+  }
+  $('ticks').innerHTML = ticks;
+
+  const setUtil = pct => {
+    $('util').textContent = Math.round(pct);
+    $('arc').style.strokeDashoffset = L * (1 - Math.max(0, Math.min(100, pct)) / 100);
+    $('arc').style.stroke = pct >= 90 ? 'var(--red)' : 'var(--amber)';
+  };
+
+  // ---- data
+  const last = async (ctx) => {
+    const res = await fetch(`${API}?context=nvidia_smi.${ctx}&after=-3&points=1&format=json`);
+    if (!res.ok) throw new Error(res.status);
+    const j = await res.json(); const row = j.data[0] || [];
+    const o = {}; j.labels.forEach((k, i) => o[k] = row[i]); return o;
+  };
+  const GB = 1e9;
+  let stale = 0;
+  async function tick() {
+    try {
+      const [u, m, p, t, c, mb, pc, ps] = await Promise.all([
+        last('gpu_utilization'), last('gpu_frame_buffer_memory_usage'), last('gpu_power_draw'),
+        last('gpu_temperature'), last('gpu_clock_freq'), last('gpu_memory_utilization'),
+        last('gpu_pcie_bandwidth_usage'), last('gpu_performance_state')]);
+      setUtil(u.gpu ?? 0);
+      const total = (m.free + m.used + m.reserved) || 20 * GB;
+      $('memused').textContent = (m.used / GB).toFixed(1) + ' GB';
+      $('bar-used').style.width = (100 * m.used / total) + '%';
+      $('bar-rsv').style.width = (100 * m.reserved / total) + '%';
+      $('memfree').textContent = (m.free / GB).toFixed(1) + ' GB free';
+      $('pwr').textContent = Math.round(p.power_draw) + ' W';
+      $('bar-pwr').style.width = (100 * p.power_draw / 130) + '%';
+      $('temp').textContent = Math.round(t.temperature);
+      $('clk').textContent = c.graphics;
+      $('membusy').textContent = Math.round(mb.memory ?? 0);
+      $('pcie').textContent = ((Math.abs(pc.rx) + Math.abs(pc.tx)) / 1e6).toFixed(1);
+      const state = Object.keys(ps).filter(k => k[0] === 'P' && ps[k] === 1)[0] || '–';
+      $('pst').textContent = state + (state === 'P0' ? ' (full speed)' : state === 'P8' ? ' (idle)' : '');
+      $('clock').textContent = new Date(u.time * 1000).toLocaleTimeString();
+      stale = 0; $('live').classList.remove('stale'); $('err').classList.remove('on');
+    } catch (e) {
+      if (++stale > 3) { $('live').classList.add('stale'); $('err').classList.add('on'); }
+    }
+  }
+
+  // ---- strip chart window (slider): 10 min default; choice remembered per browser
+  const SPANS = [['last 10 minutes', 600], ['last hour', 3600], ['last 6 hours', 21600], ['last 24 hours', 86400], ['last 7 days', 604800]];
+  let spanIdx = 0;
+  try { spanIdx = Math.min(4, Math.max(0, parseInt(localStorage.getItem('gpu-span') || '0', 10) || 0)); } catch (e) {}
+  $('span').value = spanIdx; $('span-label').textContent = SPANS[spanIdx][0];
+  $('span').addEventListener('input', () => {
+    spanIdx = +$('span').value; $('span-label').textContent = SPANS[spanIdx][0];
+    try { localStorage.setItem('gpu-span', spanIdx); } catch (e) {}
+    strip();
+  });
+  // ---- strip chart
+  const cv = $('strip'), g = cv.getContext('2d');
+  async function strip() {
+    try {
+      const q = ctx => fetch(`${API}?context=nvidia_smi.${ctx}&after=-${SPANS[spanIdx][1]}&points=240&format=json&group=average`).then(r => r.json());
+      const [u, p] = await Promise.all([q('gpu_utilization'), q('gpu_power_draw')]);
+      const W = cv.width = cv.clientWidth * devicePixelRatio, H = cv.height = 150 * devicePixelRatio;
+      g.clearRect(0, 0, W, H);
+      // drop slots with no history yet (7-day view before Netdata existed) instead of drawing them as zero
+      const keep = u.data.map(r => r[1] !== null && r[1] !== undefined);
+      const rows = u.data.filter((_, i) => keep[i]).reverse(), prow = p.data.filter((_, i) => keep[i]).reverse();
+      const n = rows.length; if (!n) return;
+      const x = i => (i / (n - 1)) * W;
+      const bone = getComputedStyle(document.documentElement);
+      // gridlines at 25/50/75/100
+      g.strokeStyle = bone.getPropertyValue('--line'); g.lineWidth = devicePixelRatio;
+      [0.25, 0.5, 0.75].forEach(f => { g.beginPath(); g.moveTo(0, H * (1 - f)); g.lineTo(W, H * (1 - f)); g.stroke(); });
+      // util fill
+      g.beginPath(); g.moveTo(0, H);
+      rows.forEach((row, i) => g.lineTo(x(i), H * (1 - (row[1] || 0) / 100)));
+      g.lineTo(W, H); g.closePath();
+      g.fillStyle = 'rgba(242,169,59,0.28)'; g.fill();
+      g.beginPath(); rows.forEach((row, i) => i ? g.lineTo(x(i), H * (1 - (row[1] || 0) / 100)) : g.moveTo(x(i), H * (1 - (row[1] || 0) / 100)));
+      g.strokeStyle = bone.getPropertyValue('--amber'); g.lineWidth = 2 * devicePixelRatio; g.stroke();
+      // power line, 0..130 W on same axis
+      g.beginPath(); prow.forEach((row, i) => { const y = H * (1 - (row[1] || 0) / 130); i ? g.lineTo(x(i), y) : g.moveTo(x(i), y); });
+      g.strokeStyle = bone.getPropertyValue('--ice'); g.lineWidth = 1.5 * devicePixelRatio; g.stroke();
+      const t0 = new Date(rows[0][0] * 1000), t1 = new Date(rows[n - 1][0] * 1000);
+      const fmt = d => SPANS[spanIdx][1] > 86400 ? d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : d.toLocaleTimeString();
+      $('range').textContent = fmt(t0) + ' – ' + fmt(t1);
+    } catch (e) { /* the 1s poll surfaces reachability */ }
+  }
+
+
+  // ---- who is on the GPU: vLLM's queue via the demo (running / waiting)
+  async function who() {
+    try {
+      const q = (await fetch('/api/queue').then(r => r.json())).queue;
+      $('who').textContent = q ? `${q.running} answering${q.waiting ? ` · ${q.waiting} waiting` : ''} · KV cache ${q.kv_pct}%` : '–';
+    } catch (e) { $('who').textContent = '–'; }
+  }
+  // ---- busy over time: averages from Netdata, windows clamped to when GPU history begins
+  //      (v1 snaps relative windows to bucket boundaries and returns nothing if the bucket predates the data,
+  //       so we ask once for db.first_entry and always query absolute after/before)
+  const WINDOWS = [['last hour', 3600], ['24 hours', 86400], ['7 days', 604800], ['30 days', 2592000]];
+  let firstEntry = 0;
+  const day = ts => new Date(ts * 1000).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  async function busy() {
+    try {
+      if (!firstEntry) {
+        const j = await fetch('/monitor/api/v2/data?contexts=nvidia_smi.gpu_utilization&after=-60&points=1&format=json2').then(r => r.json());
+        firstEntry = (j.db && j.db.first_entry) || 0;
+      }
+      const now = Math.floor(Date.now() / 1000);
+      // points=1 makes Netdata snap the window to one huge bucket (sometimes ending in the future) and the
+      // average goes wrong; 96 equal sub-buckets averaged here is exact enough and stable.
+      const avg = (ctx, after) => fetch(`${API}?context=nvidia_smi.${ctx}&after=${after}&before=${now}&points=96&group=average&format=json`)
+        .then(r => r.json()).then(j => { const v = j.data.map(r => r[1]).filter(x => typeof x === 'number');
+          return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; });
+      const cells = await Promise.all(WINDOWS.map(async ([label, w]) => {
+        const clipped = firstEntry && (now - w) < firstEntry;
+        const after = clipped ? firstEntry : now - w;
+        const hrs = (now - after) / 3600;
+        const [u, p] = await Promise.all([avg('gpu_utilization', after), avg('gpu_power_draw', after)]);
+        return { label, clipped, after, u, gpuh: u == null ? null : u / 100 * hrs, kwh: p == null ? null : p * hrs / 1000 };
+      }));
+      $('busy-cells').innerHTML = cells.map(c => `
+        <div class="cell">
+          <div class="w">${c.label}${c.clipped ? ` <em>(since ${day(c.after)})</em>` : ''}</div>
+          <div class="p">${c.u == null ? '–' : c.u.toFixed(c.u < 10 ? 1 : 0)}<small>% avg</small></div>
+          <div class="d">${c.gpuh == null ? '' : c.gpuh.toFixed(1) + ' GPU-hours'}${c.kwh == null ? '' : ' · ' + c.kwh.toFixed(1) + ' kWh'}</div>
+        </div>`).join('');
+      $('busy-note').textContent = firstEntry ? 'history since ' + day(firstEntry) : '';
+    } catch (e) { /* keep last values */ }
+  }
+  busy(); setInterval(busy, 60000);
+  who(); setInterval(who, 2000);
+  tick(); strip();
+  setInterval(tick, 1000); setInterval(strip, 5000);
+  addEventListener('resize', strip);
+})();
+</script>
+</body>
+</html>

@@ -12,10 +12,25 @@ peekPanels.tiles = (function () {
     }
     t.querySelector('#persona-big').textContent = title;
   }
+  function gpuTile(busy) {                         // "GPU busy" — the whole room's load on the one card (Netdata via /api/gpu); absent when unconfigured
+    let t = el.querySelector('#gpu-tile');
+    if (busy == null) { if (t) t.remove(); return; }
+    if (!t) {
+      t = document.createElement('div'); t.className = 'tile'; t.id = 'gpu-tile';
+      t.innerHTML = '<div class="cap">GPU busy right now</div><div class="big" id="gpu-big"></div>';
+      el.appendChild(t);
+    }
+    t.querySelector('#gpu-big').textContent = busy + '%';
+    t.classList.toggle('hot', busy >= 90);
+  }
+  async function pollGpu() {
+    try { const g = (await (await fetch('../../api/gpu')).json()).gpu; gpuTile(g ? g.busy : null); } catch (e) { /* keep the last number */ }
+  }
   return {
     mount(root) {
       el = root;
       el.classList.add('row');
+      pollGpu(); setInterval(pollGpu, 2000);
       el.innerHTML = ['sure', 'worst', 'pack'].map(k => `<div class="tile"><div class="cap" id="${k}-cap"></div><div class="big" id="${k}-big">—</div></div>`).join('');
       el.querySelector('#sure-cap').textContent = 'pieces it was sure about';
       el.querySelector('#worst-cap').textContent = 'biggest hesitation';

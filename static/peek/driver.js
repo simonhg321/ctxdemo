@@ -2,7 +2,7 @@
 peekPanels.driver = (function () {
   let el, sid = null, busy = false, lastTurn = null, lastSelect = null, persona = null, web = false, pack = 4096, compact = true;   // web: the web_search tool; window/compact: the backpack size and whether it compacts at 95% (off = overflow on purpose)
   const API = '../../api/';                                  // relative: the app lives under /demo/ behind Caddy
-  let audience = false;                                      // Linode: the server clamps plain visitors (4k, 600 tokens, no web) and says so in /api/health
+  let audience = false, room = false;                        // Linode: audience = the server clamps this visitor; room = the first-name box is on (CTXDEMO_ROOM)
   let queueTimer = null;
   const nameOf = () => { const n = el.querySelector('#name'); return n && n.value.trim() ? n.value.trim().slice(0, 24) : undefined; };
   async function watchQueue() {                              // while an answer is in flight: how many others the GPU is serving
@@ -42,10 +42,10 @@ peekPanels.driver = (function () {
         const box = el.querySelector('#asks'); box.innerHTML = '';
         peekLib.asksFor(audience).forEach(a => { const b = document.createElement('button'); b.type = 'button'; b.textContent = a; b.onclick = () => ask(a); box.appendChild(b); });
         ['#web', '#win', '#cmp'].forEach(id => { el.querySelector(id).style.display = audience ? 'none' : ''; });   // the shared GPU's knobs are the presenter's
-        el.querySelector('#name').style.display = audience ? '' : 'none';                                          // the name box is for the room, i.e. the audience
+        el.querySelector('#name').style.display = room ? '' : 'none';                                              // the name box feeds the room panel
       };
       drawAsks();
-      fetch(API + 'health').then(r => r.json()).then(h => { audience = !!h.audience; drawAsks(); }).catch(() => {});
+      fetch(API + 'health').then(r => r.json()).then(h => { audience = !!h.audience; room = !!h.room; drawAsks(); }).catch(() => {});
       el.querySelector('#f').onsubmit = e => { e.preventDefault(); ask(el.querySelector('#q').value); };
       el.querySelector('#new').onclick = () => { sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {}); status(''); };
       const fresh = msg => { sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {}); status(msg); };   // session settings are fixed at session start

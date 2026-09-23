@@ -1,6 +1,6 @@
-# demo.instockornot.club — Let's Encrypt automatic.
-#   /            the audience: shared password (on the slide); the server clamps these sessions (4k, 600 tokens, no web)
-#   /presenter/  Simon: second password; Caddy adds X-Presenter so the server gives the full set (32k, long leash, web)
+# demo.instockornot.club — Let's Encrypt automatic. One shared password (on the slide). Full options for everyone.
+#   /            the demo (wall.html)        /gpu/        the GPU dials (slider page)
+#   /monitor/    Netdata on the host          /presenter/  same demo; Caddy adds X-Presenter (only matters if CTXDEMO_AUDIENCE=1 returns)
 demo.instockornot.club {
 	encode zstd gzip
 	log {
@@ -9,19 +9,24 @@ demo.instockornot.club {
 			roll_keep 3
 		}
 	}
+	basic_auth {
+		import /etc/caddy/auth/htpasswd
+	}
+	handle_path /monitor/* {
+		reverse_proxy host.docker.internal:19999
+	}
+	redir /gpu /gpu/ 301
+	handle_path /gpu/* {
+		root * /etc/caddy/conf/site/gpu
+		file_server
+	}
 	handle_path /presenter/* {
-		basic_auth {
-			import /etc/caddy/auth/htpasswd-presenter
-		}
 		redir / /presenter/static/peek/wall.html 302
 		reverse_proxy ctxdemo:8200 {
 			header_up X-Presenter 1
 		}
 	}
 	handle {
-		basic_auth {
-			import /etc/caddy/auth/htpasswd
-		}
 		redir / /static/peek/wall.html 302
 		reverse_proxy ctxdemo:8200 {
 			header_up -X-Presenter

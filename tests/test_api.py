@@ -366,4 +366,22 @@ def test_room_feed_keeps_recent_turns_with_optional_names_and_is_presenter_only(
 def test_room_panel_and_driver_name_box_are_served(client):
     assert client.get("/static/peek/room.js").status_code == 200
     d = client.get("/static/peek/driver.js").text
-    assert "queueLine" in d and "'queue'" in d and 'id="name"' in d
+    assert "queueLine" in d and "'queue'" in d and 'id="name"' in d and "h.room" in d
+    assert "gpu" in client.get("/static/peek/tiles.js").text
+
+
+def test_room_flag_and_gpu_endpoint(fake, cfg, monkeypatch):
+    """NFCU without the clamp: CTXDEMO_ROOM=1 turns the name box on (health.room); /api/gpu reads Netdata's GPU busy %."""
+    from dataclasses import replace
+    import httpx
+    c = TestClient(create_app(vllm=fake, cfg=cfg))
+    assert c.get("/api/health").json()["room"] is False and c.get("/api/gpu").json() == {"gpu": None}
+    def handler(req):
+        assert "nvidia_smi.gpu_utilization" in str(req.url)
+        return httpx.Response(200, json={"labels": ["time", "gpu"], "data": [[1700000000, 37.4]]})
+    c2 = TestClient(create_app(vllm=fake, cfg=replace(cfg, room=True, netdata_url="http://nd"), netdata_transport=httpx.MockTransport(handler)))
+    assert c2.get("/api/health").json()["room"] is True
+    assert c2.get("/api/gpu").json() == {"gpu": {"busy": 37}}
+    from app.config import load
+    monkeypatch.setenv("CTXDEMO_ROOM", "1"); monkeypatch.setenv("NETDATA_URL", "http://x:19999")
+    l = load(); assert l.room is True and l.netdata_url == "http://x:19999"
