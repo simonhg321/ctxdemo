@@ -219,9 +219,13 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         try:
             r = layers.post("/layers", json=body)
             r.raise_for_status()
+            out = r.json()
+            if not isinstance(out, dict):
+                raise HTTPException(502, "layers sidecar: bad response")
         except httpx.HTTPError as e:
             raise HTTPException(502, f"layers sidecar: {type(e).__name__}: {e}")
-        out = r.json()
+        except ValueError:
+            raise HTTPException(502, "layers sidecar: bad response")
         out.update({"index": i, "wall_token": last.tokens[i]["t"]})
         return out
 

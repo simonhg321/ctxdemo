@@ -431,6 +431,7 @@ def test_api_layers_sends_the_sessions_real_messages_and_the_answer_prefix(fake,
     def sidecar(req: httpx.Request):
         if req.url.path == "/health":
             return httpx.Response(200, json={"model": "Qwen/Qwen3-4B", "n_layers": 36, "device": "cuda", "busy": False})
+        seen["path"] = req.url.path
         seen["body"] = json.loads(req.content)
         return httpx.Response(200, json={"tokens": ["a"], "final": {"t": "Yes", "p": 0.9}, "layers": [], "decided_at": 20,
                                          "attention": [], "cut": False, "model": "Qwen/Qwen3-4B", "n_layers": 36, "seconds": 0.2})
@@ -441,9 +442,11 @@ def test_api_layers_sends_the_sessions_real_messages_and_the_answer_prefix(fake,
     c.post("/api/turn", json={"session_id": sid, "text": "hi there"})                                # fake answers "Echo: hi there" → tokens Echo: / hi / there
     r = c.post("/api/layers", json={"session_id": sid, "index": 2}).json()
     assert r["decided_at"] == 20 and r["index"] == 2 and r["wall_token"] == "there"
+    assert seen["path"] == "/layers"
     msgs = seen["body"]["messages"]
     assert msgs[0]["role"] == "system" and msgs[-1] == {"role": "user", "content": "hi there"}          # the messages as sent, ending with the user turn
     assert seen["body"]["prefix"] == "Echo:hi"                                                       # tokens[:2] joined as text
+    assert seen["body"]["top_k"] == 5
     r0 = c.post("/api/layers", json={"session_id": sid}).json()                                      # index omitted = the first token
     assert r0["index"] == 0 and r0["wall_token"] == "Echo:"
     assert c.post("/api/layers", json={"session_id": sid, "index": 99}).status_code == 400
@@ -462,3 +465,13 @@ def test_api_layers_off_and_down(fake, cfg):
     sid = down.post("/api/session", json={"mode": "compact", "board": True, "peek": True}).json()["session_id"]
     down.post("/api/turn", json={"session_id": sid, "text": "hi"})
     assert down.post("/api/layers", json={"session_id": sid, "index": 0}).status_code == 502
+    def bad_json(req: httpx.Request):
+        if req.url.path == "/health":
+            return httpx.Response(200, json={"model": "Qwen/Qwen3-4B", "n_layers": 36, "device": "cuda", "busy": False})
+        return httpx.Response(200, text="not json")
+    badjson = TestClient(create_app(vllm=fake, cfg=replace(cfg, layers_url="http://layers"),
+                                    layers_transport=httpx.MockTransport(bad_json)))
+    assert badjson.get("/api/health").json()["layers"] == "ok"
+    sid2 = badjson.post("/api/session", json={"mode": "compact", "board": True, "peek": True}).json()["session_id"]
+    badjson.post("/api/turn", json={"session_id": sid2, "text": "hi"})
+    assert badjson.post("/api/layers", json={"session_id": sid2, "index": 0}).status_code == 502
