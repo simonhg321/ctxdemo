@@ -35,7 +35,7 @@ peekPanels.tiles = (function () {
     let t = el.querySelector('#model-tile');
     if (!t) {
       t = document.createElement('div'); t.className = 'tile model'; t.id = 'model-tile';
-      t.innerHTML = '<div class="cap">the model</div><div class="big" id="model-big"></div><div id="model-sub" class="dim"></div><div id="model-pick" style="display:none"></div>';
+      t.innerHTML = '<div class="cap">the model <span class="dim" id="model-hint"></span></div><div id="model-pick" style="display:none"></div><div class="big" id="model-big"></div><div id="model-sub" class="dim"></div>';
       el.appendChild(t);
       t.querySelector('#model-big').onclick = () => { if (models.enabled && !models.switching) { pickOpen = !pickOpen; modelTile(); } };
     }
@@ -49,7 +49,8 @@ peekPanels.tiles = (function () {
       pickOpen = false;
     } else {
       t.querySelector('#model-big').textContent = cur.label;
-      t.querySelector('#model-sub').textContent = models.error ? 'last switch failed: ' + models.error : (cur.note || '') + (models.enabled ? ' · tap to switch' : '');
+      t.querySelector('#model-sub').textContent = models.error ? 'last switch failed: ' + models.error : (cur.note || '');
+      t.querySelector('#model-hint').textContent = models.enabled ? (pickOpen ? '· pick one above' : '· tap the name to switch') : '';
     }
     t.classList.toggle('switching', !!sw);
     const pick = t.querySelector('#model-pick');

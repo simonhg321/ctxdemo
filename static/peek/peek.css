@@ -84,5 +84,6 @@ mark { background: rgba(242,169,59,.35); color: var(--bone); border-radius: .2em
 .tile.model .big { cursor: pointer; font-size: 1.4em; }
 .tile.model.switching .big { color: var(--ice); }
 .tile.model #model-sub { font-size: .7em; }
-.tile.model #model-pick { display: flex; gap: .4em; flex-wrap: wrap; margin-top: .4em; font-size: .75em; }
+.tile.model #model-pick { display: flex; gap: .4em; flex-wrap: wrap; margin: .3em 0 .5em; font-size: .75em; padding-bottom: .5em; border-bottom: 1px solid var(--line); }
+.tile.model #model-pick select { flex: 1 1 12em; min-width: 0; }
 .tile.model select, .tile.model input[type=password] { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: .25em; padding: .3em .5em; }
