@@ -28,6 +28,7 @@ class Config:
     extract_max_tokens: int = 200
     tokenizer_repo: str = ""             # act 6 chunks: HF repo whose tokenizer matches the chat model; empty = strip hidden
     turnlog: str = ""                    # path of a JSONL file that gets every question + answer; empty = log nothing (default)
+    vocab: str = "wall"                  # words on the wall: "wall" = pieces/backpack, "plain" = tokens/context window (CTXDEMO_VOCAB)
     audience: bool = False               # NFCU Linode: clamp sessions without an X-Presenter header (4k window, 600-token leash, no tools)
     room: bool = False                   # NFCU: show the optional first-name box (feeds the presenter's room panel)
     netdata_url: str = ""                # NFCU: Netdata agent for /api/gpu (GPU busy % in the tiles); empty = no tile
@@ -49,6 +50,7 @@ def load(root: Path = ROOT) -> Config:
     if os.environ.get("CTXDEMO_TURNLOG"):
         demo["turnlog"] = os.environ["CTXDEMO_TURNLOG"]
     demo["audience"] = os.environ.get("CTXDEMO_AUDIENCE") == "1"
+    demo["vocab"] = "plain" if os.environ.get("CTXDEMO_VOCAB") == "plain" else "wall"
     demo["room"] = os.environ.get("CTXDEMO_ROOM") == "1"
     demo["netdata_url"] = os.environ.get("NETDATA_URL", "")
     demo["admin_password"] = os.environ.get("CTXDEMO_ADMIN_PASSWORD", "")

@@ -30,6 +30,7 @@
   s.src = show + '.js';
   s.onerror = () => { document.getElementById('panel').textContent = 'no such panel: ' + show; };
   s.onload = async () => {
+    try { peekLib.setVocab((await (await fetch('../../api/health')).json()).vocab); } catch (e) { /* default words */ }   // relative: /demo/ prefix
     const p = peekPanels[show]; if (!p) return;
     p.mount(document.getElementById('panel'));
     if (selfReplay) {                                  // alone, no bus: for arranging the wall

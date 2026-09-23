@@ -22,7 +22,7 @@ peekPanels.driver = (function () {
       const r = await post('turn', { session_id: sid, text, name: nameOf() });
       sendTurn(r);
       const searched = (r.turn.tool_uses || []).map(u => (u.args || {}).query || u.name).join(' · ');
-      status(r.turn.event === 'compacted' ? 'the backpack was full — it compacted first' : searched ? 'searched the web: ' + searched : '');
+      status(r.turn.event === 'compacted' ? `the ${peekLib.words().pack} was full — it compacted first` : searched ? 'searched the web: ' + searched : '');
       el.querySelector('#q').value = '';
     } catch (e) { status('error: ' + e.message); if (/no such session/.test(e.message)) sid = null; }   // show the real error; a restart forgets sessions
     clearInterval(queueTimer); queueTimer = null;
@@ -37,7 +37,7 @@ peekPanels.driver = (function () {
     mount(root) {
       el = root;
       el.innerHTML = '<div class="cap">ask the model</div><form id="f" style="display:flex;gap:.5em"><input type="text" id="q" placeholder="type a question" autocomplete="off"><button>Ask</button></form>' +
-        '<div id="asks" style="display:flex;flex-wrap:wrap;gap:.3em;font-size:.8em"></div><div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;font-size:.9em"><button id="new" type="button">Start over</button><button id="web" type="button" title="give it web search (a fresh session)">🌐 web: off</button><button id="win" type="button" title="backpack size (a fresh session)">🎒 4k</button><button id="cmp" type="button" title="compact at 95% full, or let it overflow (a fresh session)">compact: on</button><input type="text" id="name" placeholder="your first name (optional)" maxlength="24" autocomplete="off" style="width:auto;flex:0 1 14em;display:none" title="shows next to your questions on the presenter\'s screen"><span id="st" class="dim"></span></div>';
+        '<div id="asks" style="display:flex;flex-wrap:wrap;gap:.3em;font-size:.8em"></div><div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;font-size:.9em"><button id="new" type="button">Start over</button><button id="web" type="button" title="give it web search (a fresh session)">🌐 web: off</button><button id="win" type="button" title="context size (a fresh session)">🎒 4k</button><button id="cmp" type="button" title="compact at 95% full, or let it overflow (a fresh session)">compact: on</button><input type="text" id="name" placeholder="your first name (optional)" maxlength="24" autocomplete="off" style="width:auto;flex:0 1 14em;display:none" title="shows next to your questions on the presenter\'s screen"><span id="st" class="dim"></span></div>';
       const drawAsks = () => {
         const box = el.querySelector('#asks'); box.innerHTML = '';
         peekLib.asksFor(audience).forEach(a => { const b = document.createElement('button'); b.type = 'button'; b.textContent = a; b.onclick = () => ask(a); box.appendChild(b); });
@@ -57,7 +57,9 @@ peekPanels.driver = (function () {
       el.querySelector('#f').onsubmit = e => { e.preventDefault(); ask(el.querySelector('#q').value); };
       el.querySelector('#new').onclick = () => { sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {}); status(''); };
       const fresh = msg => { sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {}); status(msg); };   // session settings are fixed at session start
-      el.querySelector('#win').onclick = () => { pack = { 4096: 8192, 8192: 32768 }[pack] || 4096; el.querySelector("#win").textContent = "🎒 " + pack / 1024 + "k"; fresh("backpack: " + pack + " pieces"); };
+      const W = peekLib.words();
+      el.querySelector('#win').textContent = W.packIcon + ' ' + pack / 1024 + 'k'; el.querySelector('#win').title = W.pack + ' size (a fresh session)';
+      el.querySelector('#win').onclick = () => { pack = { 4096: 8192, 8192: 32768 }[pack] || 4096; el.querySelector("#win").textContent = W.packIcon + " " + pack / 1024 + "k"; fresh(W.pack + ": " + pack + " " + W.pieces); };
       el.querySelector('#cmp').onclick = () => { compact = !compact; el.querySelector('#cmp').textContent = 'compact: ' + (compact ? 'on' : 'off'); fresh(compact ? 'it will compact at 95% full' : 'no compaction — it will overflow'); };
       el.querySelector('#web').onclick = () => {                 // toggling means a fresh session: tools are fixed at session start
         web = !web; sid = null; lastTurn = null; lastSelect = null; peekBus.send('clear', {});

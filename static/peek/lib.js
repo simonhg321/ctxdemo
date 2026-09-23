@@ -72,6 +72,21 @@
   const wallFit = (width, fit) => (fit === 'stack' ? 'stack' : 'frozen');
   // the ask box's waiting line, from /api/queue: '' when idle or unknown.
   const queueLine = q => (!q || (!q.running && !q.waiting) ? '' : `${q.running} answering` + (q.waiting ? ` · ${q.waiting} waiting` : ''));
-  const api = { queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight };
+  // the words on the wall: 'wall' = pieces / backpack (students), 'plain' = tokens / context window (an engineer audience).
+  // CTXDEMO_VOCAB on the server -> /api/health.vocab -> panel.html calls setVocab before any panel mounts.
+  let vocabMode = 'wall';
+  const setVocab = mode => { vocabMode = mode === 'plain' ? 'plain' : 'wall'; };
+  const words = mode => ((mode || vocabMode) === 'plain'
+    ? { pieces: 'tokens', piece: 'token', pack: 'context window', Pack: 'Context window', packIcon: '\u{1FA9F}' }
+    : { pieces: 'pieces', piece: 'piece', pack: 'backpack', Pack: 'Backpack', packIcon: '\u{1F392}' });
+  // our own prose (explain cards, captions) rewritten for the plain vocabulary; whole words only, never user text
+  function plainText(text, mode) {
+    if ((mode || vocabMode) !== 'plain') return String(text || '');
+    return String(text || '')
+      .replace(/ \(the real word is \*tokens\*\)/g, '')
+      .replace(/\bPieces\b/g, 'Tokens').replace(/\bpieces\b/g, 'tokens').replace(/\bPiece\b/g, 'Token').replace(/\bpiece\b/g, 'token')
+      .replace(/\bBackpack\b/g, 'Context window').replace(/\bbackpack\b/g, 'context window');
+  }
+  const api = { setVocab, words, plainText, queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.peekLib = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -10,8 +10,8 @@
 
   function renderBlocks(blocks) {
     return blocks.map(b => {
-      if (b.type === 'p') return `<p>${peekLib.explainInline(b.text)}</p>`;
-      if (b.type === 'ul') return `<ul>${b.items.map(i => `<li>${peekLib.explainInline(i)}</li>`).join('')}</ul>`;
+      if (b.type === 'p') return `<p>${peekLib.explainInline(peekLib.plainText(b.text))}</p>`;
+      if (b.type === 'ul') return `<ul>${b.items.map(i => `<li>${peekLib.explainInline(peekLib.plainText(i))}</li>`).join('')}</ul>`;
       if (b.type === 'personas') return '<div id="explain-personas" class="dim">loading…</div>';
       return '';
     }).join('');
@@ -82,10 +82,12 @@
   }
 
   async function load() {
+    try { peekLib.setVocab((await (await fetch('../../api/health')).json()).vocab); } catch (e) { /* default words */ }   // relative: /demo/ prefix
     const files = await (await fetch('explain.json')).json();
     cardsData = await Promise.all(files.map(async name => {
       const text = await (await fetch('explain/' + name)).text();
-      return Object.assign({ id: fileId(name) }, peekLib.explainParse(text));
+      const parsed = peekLib.explainParse(text);
+      return Object.assign({ id: fileId(name) }, parsed, { label: peekLib.plainText(parsed.label) });
     }));
     buildBar();
     peekBus.join(room);

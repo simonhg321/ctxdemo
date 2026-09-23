@@ -12,7 +12,7 @@ peekPanels.chunks = (function () {
       if (!ch.length) { strip.textContent = t.user; count.textContent = ''; return; }     // no tokenizer on this server: show the sentence plain
       strip.innerHTML = ch.map(c => `<span class="chunk">${esc(c)}</span>`).join('');
       const words = t.user.trim().split(/\s+/).length;
-      count.textContent = `${words} word${words === 1 ? '' : 's'} → ${ch.length} pieces`;
+      count.textContent = `${words} word${words === 1 ? '' : 's'} → ${ch.length} ${peekLib.words().pieces}`;
     },
   };
 })();

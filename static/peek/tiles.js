@@ -82,9 +82,10 @@ peekPanels.tiles = (function () {
       pollGpu(); setInterval(pollGpu, 2000);
       pollModels(); setInterval(pollModels, 3000);
       el.innerHTML = ['sure', 'worst', 'pack'].map(k => `<div class="tile"><div class="cap" id="${k}-cap"></div><div class="big" id="${k}-big">—</div></div>`).join('');
-      el.querySelector('#sure-cap').textContent = 'pieces it was sure about';
+      const W = peekLib.words();
+      el.querySelector('#sure-cap').textContent = W.pieces + ' it was sure about';
       el.querySelector('#worst-cap').textContent = 'biggest hesitation';
-      el.querySelector('#pack-cap').textContent = 'backpack full';
+      el.querySelector('#pack-cap').textContent = W.pack + ' full';
       peekBus.on('persona', d => personaTile(d.title));   // driver re-sends this on hello, so a late-joining tiles panel lights up too
     },
     onTurn(msg) {

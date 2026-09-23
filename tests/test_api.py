@@ -408,3 +408,14 @@ def test_model_endpoints(fake, cfg, tmp_path):
     assert c.get("/static/peek/tiles.js").text.count("api/models") >= 1
     plain = TestClient(create_app(vllm=fake, cfg=cfg))                 # no switcher configured: read-only list, switch disabled
     assert plain.get("/api/models").json()["models"] == [] and plain.post("/api/model", json={"id": "x", "password": "p"}).status_code == 403
+
+
+def test_vocab_flag_reaches_health_and_the_panels_use_it(client, monkeypatch):
+    assert client.get("/api/health").json()["vocab"] == "wall"
+    from app.config import load
+    monkeypatch.setenv("CTXDEMO_VOCAB", "plain"); assert load().vocab == "plain"
+    monkeypatch.setenv("CTXDEMO_VOCAB", "weird"); assert load().vocab == "wall"        # anything else = the default words
+    assert "setVocab(" in client.get("/static/peek/panel.html").text                     # every panel learns the words before it mounts
+    for f in ("tiles.js", "chunks.js", "driver.js", "wire.js", "answer.js", "almost.js"):
+        assert "peekLib.words(" in client.get(f"/static/peek/{f}").text, f
+    assert "plainText(" in client.get("/static/peek/explain.js").text                   # the explain cards too

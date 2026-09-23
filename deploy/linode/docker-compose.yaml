@@ -45,6 +45,7 @@ services:
       - HF_HUB_OFFLINE=1
       - CTXDEMO_TURNLOG=/srv/data/logs/turns.jsonl    # on for the talk (said on the slide; first names optional)
       - CTXDEMO_ROOM=1                                 # optional first-name box -> the room feed
+      - CTXDEMO_VOCAB=plain                            # say "tokens" and "context window" on this wall (Gonzaga keeps pieces/backpack)
       - NETDATA_URL=http://host.docker.internal:19999  # GPU busy % tile (Netdata on the host)
       - CTXDEMO_ADMIN_PASSWORD=${CTXDEMO_ADMIN_PASSWORD:-}   # the model switch (from .env; empty = switching off)
       - CTXDEMO_COMPOSE_DIR=/srv/compose                     # where .env lives inside the container

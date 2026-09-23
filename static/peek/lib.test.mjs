@@ -115,3 +115,15 @@ test('queueLine: what the ask box says while waiting', () => {
   assert.equal(L.queueLine({ running: 1, waiting: 0 }), '1 answering');
   assert.equal(L.queueLine({ running: 4, waiting: 2 }), '4 answering · 2 waiting');
 });
+test('words: wall vocabulary vs plain (tokens / context window)', () => {
+  assert.deepEqual(L.words('wall'), { pieces: 'pieces', piece: 'pieces'.slice(0, -1), pack: 'backpack', Pack: 'Backpack', packIcon: '🎒' });
+  assert.deepEqual(L.words('plain'), { pieces: 'tokens', piece: 'token', pack: 'context window', Pack: 'Context window', packIcon: '🪟' });
+  assert.equal(L.words(undefined).pieces, 'pieces');
+});
+test('plainText: rewrites our own prose for the plain vocabulary, leaves it alone for the wall', () => {
+  const md = 'Your sentence is chopped into **pieces** (the real word is *tokens*). One piece. The **backpack** is the context window; the wall calls it the backpack.';
+  assert.equal(L.plainText(md, 'wall'), md);
+  assert.equal(L.plainText(md, 'plain'), 'Your sentence is chopped into **tokens**. One token. The **context window** is the context window; the wall calls it the context window.');
+  assert.equal(L.plainText('# the backpack', 'plain'), '# the context window');
+  assert.equal(L.plainText('Pieces it was sure about · a masterpiece', 'plain'), 'Tokens it was sure about · a masterpiece');   // whole words only
+});

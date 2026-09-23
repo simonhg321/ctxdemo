@@ -27,7 +27,7 @@ peekPanels.answer = (function () {
       timer = setInterval(() => {
         if (i >= toks.length) {
           clearInterval(timer); out.querySelectorAll('.piece').forEach(s => ring.has(+s.dataset.i) && s.classList.add('ring'));
-          if (t.cut) { const c = document.createElement('span'); c.className = 'cut'; c.textContent = ` ⏹ cut off here — the wall allows ${toks.length} pieces per answer; the model was not done`; out.appendChild(c); }
+          if (t.cut) { const c = document.createElement('span'); c.className = 'cut'; c.textContent = ` ⏹ cut off here — the wall allows ${toks.length} ${peekLib.words().pieces} per answer; the model was not done`; out.appendChild(c); }
           return;
         }
         const s = document.createElement('span');

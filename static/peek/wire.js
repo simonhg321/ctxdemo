@@ -13,8 +13,8 @@ peekPanels.wire = (function () {
       req.innerHTML = peekLib.wireHighlight(wire.request);
       resp.innerHTML = peekLib.wireHighlight(wire.response);
       note.textContent = wire.total > wire.shown
-        ? `first ${wire.shown} of ${wire.total} pieces shown — every one carries its probability and its top-5 runners-up`
-        : `${wire.total} pieces, each with its probability and its top-5 runners-up`;
+        ? `first ${wire.shown} of ${wire.total} ${peekLib.words().pieces} shown — every one carries its probability and its top-5 runners-up`
+        : `${wire.total} ${peekLib.words().pieces}, each with its probability and its top-5 runners-up`;
     } else {
       req.innerHTML = peekLib.wireHighlight(draft());
       resp.innerHTML = '<span class="dim">ask something and the reply lands here</span>';
@@ -29,7 +29,7 @@ peekPanels.wire = (function () {
         '<div class="wire-head"><div class="cap">how do we know? — the actual request and reply</div>' +
         '<button type="button" id="close" title="Esc">close</button></div>' +
         '<div class="wire-intro">A standard <b>OpenAI-style chat request</b> to vLLM. The two <mark>marked</mark> flags ask the server ' +
-        'to keep the probabilities it already computed for every piece. Nothing inside the model is touched or patched.</div>' +
+        'to keep the probabilities it already computed for every ' + peekLib.words().piece + '. Nothing inside the model is touched or patched.</div>' +
         '<div class="wire-cols"><div><div class="cap">we send</div><pre id="req"></pre></div>' +
         '<div><div class="cap">it answers</div><pre id="resp"></pre><div id="note" class="dim"></div></div></div>';
       el.querySelector('#close').onclick = close;
