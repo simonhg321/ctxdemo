@@ -56,3 +56,9 @@ How the model reads and chooses: the sentence in pieces (tokens), the answer col
   and one line there. The `who it speaks as` card's `<!-- personas -->` line renders the live persona list.
 - `wall.html?bar=0` drops the explain bar entirely (script not even loaded) so the DEFAULT iframe geometry is untouched.
 
+## Piece 4: layers (added 2026-09-23)
+A small sibling model (TransformerLens, separate container) reads the same prompt layer-by-layer and shows what it
+would have said at each depth, plus where attention looked — a logit-lens column next to the wall's own answer.
+Runs as its own sidecar; see `layers/README.md` for the container, API, and VRAM notes. ctxdemo talks to it over
+`LAYERS_URL` (`/api/health` reports `layers`). View it at `.../demo/static/peek/wall.html?with=layers`.
+

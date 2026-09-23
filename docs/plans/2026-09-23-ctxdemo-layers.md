@@ -946,3 +946,26 @@ Then update `/Users/project/dsc/HANDOFF.md` (piece 4 live, URLs, VRAM now used, 
 - **Spec coverage.** §Goal two moments → Task 7 (`onTurn` → index 0, `onSelect` → index i). §Caveat sibling + disagreement line → Task 6 `agree` + Task 7 `#verdict`. §Why HACLab / VRAM → Task 4 Step 2 checks the second GPU process. §1 sidecar: image/compose/bind addresses/health/lock/prompt cut/serialisation → Tasks 1–4 (the spec's `prompt` field kept; `messages` added so the sidecar's own tokenizer applies the chat template — recorded in the README). §2 ctxdemo: `layers_url`, health, `/api/layers` with real messages + prefix, 404/400/502, never inside a turn → Task 5 (turn-log line dropped: the panel's call is out of band and the log would only see it if the endpoint wrote it — deferred, not needed for the demo; noted here as the one spec item not implemented). §3 panel/explain/wall slot → Task 7. §4 tests → Tasks 1–3 (toy runner instead of `attn-only-1l`, so no download), 5, 6, 7 headless, 8 live. §5 decisions → defaults in Tasks 3–4.
 - **Placeholders.** None: every step has code or an exact command.
 - **Type consistency.** `Engine.analyze(messages, prompt, prefix, top_k, max_tokens)` positional order matches `server.py`'s `to_thread` call. Sidecar response keys (`tokens, final, layers, decided_at, attention, cut, model, n_layers, seconds`) match `layersModel`/`attentionHeat` fixtures and the ctxdemo fake in Task 5. `wall_token`/`index` added by ctxdemo are what `layers.js` reads via `last.index`. Bus message names: `turn` (now with `session_id`), `select`, `clear`, new `layers`.
+
+## Live specimen (Task 8, 2026-09-23)
+
+Deployed to HACLab via `./deploy.sh`; health line: `..."chunks":true,"layers":"ok"`.
+
+Controller ruling: network path to `iiat.gonzaga.edu:8443` changed today, so the live check ran on the box itself
+against ctxdemo's direct port (`ssh simong@IIAT-HACLAB-01 curl http://127.0.0.1:8200/...`) instead of through Caddy.
+Same bodies as below, no `-k` needed since it's plain HTTP on loopback.
+
+Prompt: "Monty Hall, but the host opens a door at random and it happens to be a goat. Should I switch?"
+
+- Wall's answer (qwen3-8b, 61 tokens): "No, switching doesn't help in this case. The original Monty Hall problem
+  assumes..." — first token `'No'` (p=0.7271).
+- `/api/layers` index 0 (sibling qwen3-4b reading the same prompt): final `Yes` (p=0.9998), `decided_at` 31 / 36
+  layers, 0.51 s. **Disagree** — the wall said "No", the sibling's logit-lens settles on "Yes" from layer 26 onward
+  (layer trace: L21 first flips to " yes" p=0.14, L26 " yes" p=0.75, L31 "Yes" p=0.63, L36 "Yes" p=0.9998). A clean
+  example of the "host opens at random" variant (switching is a coin flip, not a win) tripping up the smaller model
+  while the 8B gets it right.
+- No token in this answer actually crossed into "coin-flip" red (p<0.5 per `peekLib.tone`) — the whole answer stayed
+  confident. Picked the least-sure token instead: index 42, `'s` at p=0.5579 ("unsure", amber). `/api/layers`
+  index 42: sibling final `'s` (p=0.7527), `decided_at` 36 / 36, 0.2 s — **agree** with the wall here.
+- Real-browser tap-a-token / screenshot step: **skipped** per controller instruction (controller does the visual
+  check separately).

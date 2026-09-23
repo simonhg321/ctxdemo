@@ -14,6 +14,7 @@ services:
       - VLLM_URL=http://host.docker.internal:8100
       - VISION_URL=http://host.docker.internal:11434
       - VISION_MODEL=qwen2.5vl:7b
+      - LAYERS_URL=http://host.docker.internal:8400
       - EARS_URL=http://whisper:8300
       - HF_HUB_OFFLINE=1
       - CTXDEMO_TURNLOG=/srv/data/logs/turns.jsonl   # every question + answer, on the data volume; REMOVE this line for an audience that must not be logged
