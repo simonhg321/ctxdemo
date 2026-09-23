@@ -2,7 +2,7 @@
 // Asks /api/layers for the first token after every turn, and for any token tapped in the answer (bus `select`).
 peekPanels.layers = (function () {
   let el, sid = null, toks = [], busy = false, which = 'decided', last = null;
-  const esc = s => String(s == null ? '' : s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const vis = t => String(t).replace(/^Ġ| /g, '␣').replace(/\n/g, '⏎').replace(/^<\|.*\|>$/, '·');
   function draw(resp, index) {
     const W = peekLib.words();
@@ -18,7 +18,7 @@ peekPanels.layers = (function () {
     else if (m.agree === true) verdict.innerHTML = `both say <b>${esc(String(m.sibling).trim())}</b>`;
     else verdict.textContent = '';
     const h = peekLib.attentionHeat(resp, which);
-    el.querySelector('#heat').innerHTML = h.cells.map(c => `<span class="hcell" style="background:rgba(127,200,232,${(0.08 + 0.72 * c.w).toFixed(2)})">${esc(vis(c.t))}</span>`).join('');
+    el.querySelector('#heat').innerHTML = h.cells.map(c => { const w = Number.isFinite(c.w) ? c.w : 0; return `<span class="hcell" style="background:rgba(127,200,232,${(0.08 + 0.72 * w).toFixed(2)})">${esc(vis(c.t))}</span>`; }).join('');
     el.querySelector('#heatcap').textContent = h.layer ? `where it looked · layer ${h.layer}` : '';
     el.querySelector('#meta').textContent = resp ? `${resp.model.split('/').pop()} · ${resp.n_layers} layers · ${resp.seconds}s${resp.cut ? ' · prompt cut to the last ' + resp.tokens.length + ' ' + W.pieces : ''}` : '';
     peekBus.send('layers', { index, decided_at: m.decided_at, agree: m.agree });
