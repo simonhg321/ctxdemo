@@ -165,3 +165,11 @@ def test_wait_for_model_polls_until_the_server_serves_it():
     v = VLLM("http://x", "old", transport=httpx.MockTransport(handler))
     assert v.wait_for_model("new", timeout=5, every=0.01) is True and v.model == "new"
     assert v.wait_for_model("never", timeout=0.05, every=0.01) is False
+
+
+def test_refresh_model_keeps_the_configured_one_when_the_server_lists_many():
+    """Ollama lists every model it has; keep ours. vLLM lists exactly one; take it (the model switch renames it)."""
+    many = lambda r: httpx.Response(200, json={"data": [{"id": "other"}, {"id": "mine"}]})
+    v = VLLM("http://x", "mine", transport=httpx.MockTransport(many)); assert v.refresh_model() == "mine"
+    one = lambda r: httpx.Response(200, json={"data": [{"id": "served"}]})
+    v2 = VLLM("http://x", "configured", transport=httpx.MockTransport(one)); assert v2.refresh_model() == "served"

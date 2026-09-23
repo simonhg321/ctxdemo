@@ -105,7 +105,7 @@ class VLLM:
             r = self._c.get("/v1/models", timeout=5)
             r.raise_for_status()
             ids = [d.get("id") for d in (r.json().get("data") or []) if d.get("id")]
-            if ids:
+            if ids and self.model not in ids:              # vLLM serves one model: use its name. Ollama lists many: keep ours if present.
                 self.model = ids[0]
             return self.model
         except (httpx.HTTPError, ValueError):
