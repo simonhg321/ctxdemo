@@ -16,7 +16,7 @@ The hooks look inside a **smaller sibling** (Qwen3-4B) of the model answering th
 The L40 has 46 GB; vLLM reserves 40 % (18.8 GB) and the whiteboard reader takes 6 GB when it runs, leaving ~20 GB. Qwen3-4B in bf16 needs ~8 GB plus a few GB of activations at 1–2k tokens. Fits with no change to vLLM. (The Linode's 20 GB card would need vLLM cut to ~65 %; not now.) Verified on the Mac 9/21: TransformerLens 3.9 `TransformerBridge.boot_transformers` loads Qwen3-1.7B, `run_with_cache` gives `hook_resid_post` per layer and attention patterns, logit lens shows "Paris" forming; the first token is an attention sink and must be filtered out of the "where it looked" view.
 
 ## 1. The sidecar (`layers/`, new)
-A small GPU container beside vLLM in the HACLab compose. Nothing else in ctxdemo imports torch.
+A small GPU container in **its own compose file** (`layers/docker-compose.yaml`), like vLLM and the vision model: it binds to `127.0.0.1:8400` and the docker bridge `172.17.0.1:8400`, and ctxdemo reaches it as `LAYERS_URL=http://host.docker.internal:8400` — the `VISION_URL` pattern. Independent lifecycle (stop it to free VRAM), portable to Typhoon/Linode, and ctxdemo never rebuilds a torch image. Nothing else in ctxdemo imports torch.
 - **Image:** `pytorch/pytorch:2.x-cuda12.x-runtime` + `transformer_lens==3.9.*` + `fastapi`. Model from the shared HF cache (`/mnt/data/hf`), `LAYERS_MODEL=Qwen/Qwen3-4B` (env; `Qwen/Qwen3-1.7B` as the light option). Loads once at start (~20 s), `gpus: all`, internal port 8400, healthcheck `/health` → `{model, layers, device}`.
 - **`POST /layers`** `{prompt: str, top_k: 5, max_tokens: 1536}` → one forward pass with cache (~100–300 ms on the L40) →
   ```
@@ -49,10 +49,10 @@ A small GPU container beside vLLM in the HACLab compose. Nothing else in ctxdemo
 - `lib.test.mjs`: `layersModel(resp, wallToken)` → chip list with tones + decided index; `attentionHeat(weights)` normalisation with the sink dropped.
 - Browser: headless render of `layers` with a canned response in `replay.json`; then live on HACLab: Monty Hall first token, then tap a red token in the C division answer.
 
-## 5. Open questions for Simon
-1. **Sibling size:** Qwen3-4B (closer to the 8B, ~8 GB) or Qwen3-1.7B (faster, ~4 GB, more disagreement)? Recommend 4B; the env var makes it a one-line change.
-2. **Auto-analyse the first token every turn** (recommended, it's the anchor demo) — costs one sidecar call per turn, off the turn's critical path.
-3. **Deploy the sidecar into the existing HACLab compose** (same `docker compose up -d --build`, model pulled at first start from the box's cache/internet) — yes unless you want it separate.
+## 5. Decisions (Simon, 2026-09-23 09:19)
+1. **Sibling:** Qwen3-4B (`LAYERS_MODEL` env; 1.7B is a one-line change).
+2. **Auto-analyse the first token of every answer:** yes — one sidecar call per turn, off the turn's critical path.
+3. **Separate compose** (`layers/`), not folded into ctxdemo's: "more modular, better".
 
 ## 6. Order of work
 Sidecar with toy-model tests → HACLab compose + first live `/layers` (Monty Hall) → ctxdemo endpoint → panel + explain chip → `?with=layers` → deploy → Simon taps things. Estimate: one session. Roads (piece 2) and thinking-out-loud (piece 3) follow, specs already drafted for 2.
