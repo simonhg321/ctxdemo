@@ -26,13 +26,13 @@ def host_restarts(cmd: list[str], cwd: Path) -> int:
 
 class Switcher:
     def __init__(self, models: list[dict], env_file: Path, compose_dir: Path, hub_dir: Path, password: str,
-                 runner: Callable[[list[str], Path], int] | None = None, wait_healthy: Callable[[], bool] | None = None,
+                 runner: Callable[[list[str], Path], int] | None = None, wait_for: Callable[[str], bool] | None = None,
                  on_switched: Callable[[dict], None] | None = None):
         self.models = models
         self.env_file, self.compose_dir, self.hub_dir = Path(env_file), Path(compose_dir), Path(hub_dir)
         self.password = password
         self._run = runner or _run
-        self._wait = wait_healthy or (lambda: True)
+        self._wait = wait_for or (lambda model_id: True)     # blocks until the server serves model_id (the old one stays healthy until the restart begins)
         self._on_switched = on_switched or (lambda m: None)
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
@@ -77,8 +77,8 @@ class Switcher:
             rc = self._run(["docker", "compose", "up", "-d", "--force-recreate", "vllm"], self.compose_dir)
             if rc != 0:
                 raise RuntimeError(f"docker compose exited {rc}")
-            if not self._wait():
-                raise RuntimeError("vLLM did not come back healthy")
+            if not self._wait(m["id"]):
+                raise RuntimeError("vLLM did not come up serving the new model")
             self._on_switched(m)
         except Exception as e:                        # the wall shows the error; the old model may or may not be back
             log.error("model switch to %s failed: %s", m["id"], e)

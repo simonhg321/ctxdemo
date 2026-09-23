@@ -394,7 +394,7 @@ def test_model_endpoints(fake, cfg, tmp_path):
     sw = Switcher(models=[{"id": "fake", "label": "Fake", "note": "", "args": "", "tools": True, "tokenizer": "x"},
                           {"id": "other", "label": "Other", "note": "", "args": "--y", "tools": False, "tokenizer": "y"}],
                   env_file=tmp_path / ".env", compose_dir=tmp_path, hub_dir=tmp_path, password="pw",
-                  runner=lambda cmd, cwd: calls.append(cmd) or 0, wait_healthy=lambda: True, on_switched=lambda m: None)
+                  runner=lambda cmd, cwd: calls.append(cmd) or 0, wait_for=lambda mid: True, on_switched=lambda m: None)
     c = TestClient(create_app(vllm=fake, cfg=cfg, switcher=sw))
     j = c.get("/api/models").json()
     assert j["current"] == "fake" and j["switching"] is None and [m["id"] for m in j["models"]] == ["fake", "other"]

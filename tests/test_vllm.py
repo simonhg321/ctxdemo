@@ -154,3 +154,14 @@ def test_queue_parses_vllm_metrics_and_is_none_without_them():
     assert v.queue() == {"running": 3, "waiting": 2, "kv_pct": 42}
     v2 = VLLM("http://x", "m", transport=httpx.MockTransport(lambda r: httpx.Response(404)))
     assert v2.queue() is None
+
+
+def test_wait_for_model_polls_until_the_server_serves_it():
+    state = {"n": 0}
+    def handler(req):
+        state["n"] += 1
+        if req.url.path == "/health": return httpx.Response(200)
+        return httpx.Response(200, json={"data": [{"id": "new" if state["n"] > 4 else "old"}]})
+    v = VLLM("http://x", "old", transport=httpx.MockTransport(handler))
+    assert v.wait_for_model("new", timeout=5, every=0.01) is True and v.model == "new"
+    assert v.wait_for_model("never", timeout=0.05, every=0.01) is False

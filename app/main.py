@@ -99,7 +99,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
             if hasattr(chunker, "use"): chunker.use(m.get("tokenizer"))
         switcher = Switcher(load_models(), env_file=Path(cfg.compose_dir) / ".env", compose_dir=Path(cfg.compose_dir),
                             hub_dir=Path(cfg.hf_hub_dir or "/nonexistent"), password=cfg.admin_password, runner=host_restarts,
-                            wait_healthy=lambda: vllm.wait_healthy() if hasattr(vllm, "wait_healthy") else True, on_switched=switched)
+                            wait_for=lambda mid: vllm.wait_for_model(mid) if hasattr(vllm, "wait_for_model") else True, on_switched=switched)
     switcher = switcher or Switcher(models=[], env_file=Path("/nonexistent/.env"), compose_dir=Path("/nonexistent"), hub_dir=Path("/nonexistent"), password="")
     current_model = lambda: getattr(vllm, "model", cfg.model)
     scr = script_mod.load()

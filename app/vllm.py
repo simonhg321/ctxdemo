@@ -111,11 +111,11 @@ class VLLM:
         except (httpx.HTTPError, ValueError):
             return None
 
-    def wait_healthy(self, timeout: float = 900, every: float = 3.0) -> bool:
-        """Block until the server answers /health (and lists a model) or the timeout passes."""
+    def wait_for_model(self, model_id: str, timeout: float = 900, every: float = 3.0) -> bool:
+        """Block until the server is healthy AND serves model_id (a restart in flight still answers for the old one)."""
         t0 = time.time()
         while time.time() - t0 < timeout:
-            if self.health() and self.refresh_model():
+            if self.health() and self.refresh_model() == model_id:
                 return True
             time.sleep(every)
         return False
