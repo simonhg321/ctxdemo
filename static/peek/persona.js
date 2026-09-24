@@ -32,7 +32,7 @@ peekPanels.persona = (function () {
       fetch('../../api/personas').then(r => r.json()).then(d => { personas = d.personas || []; render(); });   // relative: /demo/ prefix
       let freetext = 'on', unlocked = false;                  // the custom system prompt is free text too: same gate as the ask box (CTXDEMO_FREETEXT)
       try { unlocked = sessionStorage.getItem('ctxdemo_unlocked') === '1'; } catch (e) { /* stays locked */ }
-      const gate = () => { const ok = peekLib.freetextAllows(freetext, unlocked); el.querySelector('#custom').style.display = ok ? '' : 'none'; if (!ok) el.querySelector('#custom-form').style.display = 'none'; };
+      const gate = () => { const ok = freetext !== 'off' || unlocked; el.querySelector('#custom').style.display = ok ? '' : 'none'; if (!ok) el.querySelector('#custom-form').style.display = 'none'; };   // Simon 2026-09-24: a custom persona is harmless, so only a hard 'off' hides it; 'password' locks the ask box alone
       fetch('../../api/health').then(r => r.json()).then(h => { freetext = h.freetext || 'on'; gate(); }).catch(() => {});
       peekBus.on('unlock', () => { unlocked = true; gate(); });
       el.querySelector('#wire').onclick = () => peekBus.send('wire', { open: true });   // wall.html hosts the wire panel as an overlay
