@@ -104,7 +104,7 @@ mark { background: rgba(242,169,59,.35); color: var(--bone); border-radius: .2em
 #panel.layers .linkish { font-size: .8em; padding: .1em .4em; }
 
 /* the temperature card's live dials */
-#sampling-controls { margin-top: .8em; padding-top: .6em; border-top: 1px solid var(--line); }
+#sampling-controls { margin: .2em 0 1em; padding-bottom: .8em; border-bottom: 1px solid var(--line); }
 #sampling-controls .dial { display: grid; grid-template-columns: 8em 1fr 3.5em; gap: .3em .8em; align-items: center; margin: .35em 0; }
 #sampling-controls .dial-name { font-weight: 600; }
 #sampling-controls .dial-val { text-align: right; font-variant-numeric: tabular-nums; }

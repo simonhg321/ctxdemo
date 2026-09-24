@@ -83,7 +83,7 @@
       box.querySelectorAll('input[type=range]').forEach(inp => { inp.value = sampling[inp.dataset.k] === -1 ? 0 : sampling[inp.dataset.k]; });
       readout(); peekBus.send('sampling', { temperature: 0 });
     });
-    card.appendChild(box); readout();
+    card.insertBefore(box, card.children[1] || null); readout();   // right under the title: the dials are the point of this card, the prose is the footnote
   }
 
   function open(id) {

@@ -5,6 +5,6 @@
 - **top-k** — same idea by count: only the best k pieces are in the hat.
 - **repetition penalty** — a small tax on any piece that has already appeared, so a rut gets shallower instead of deeper.
 
-None of these change what the model *knows*. They only change how the one piece gets picked from the list it already made.
+None of these change what the model **knows**. They only change how the one piece gets picked from the list it already made.
 
-The dials below are live on this wall. Set them, close this card, ask the same question twice, and watch the colours change: at temperature 0.8 the same question stops giving the same answer.
+The dials above are live on this wall. Set them, close this card, ask the same question twice, and watch the colours change: at temperature 0.8 the same question stops giving the same answer.
