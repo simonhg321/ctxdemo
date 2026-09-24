@@ -58,3 +58,13 @@ def test_switch_writes_env_restarts_vllm_and_reports(tmp_path):
     assert calls[0][0][:4] == ["docker", "compose", "up", "-d"] and "vllm" in calls[0][0] and calls[0][1] == tmp_path
     assert ("switched", "Qwen/Qwen3-4B-FP8") in calls and seen == ["Qwen/Qwen3-4B-FP8"]      # waited for THAT model, not "any healthy"
     assert sw.status(current="Qwen/Qwen3-4B-FP8")["switching"] is None
+
+
+def test_switch_to_the_model_already_running_is_refused(tmp_path):
+    # a same-model "switch" wrote .env, the host recreated vLLM for nothing, and the waiter returned instantly because the
+    # old server already served that id — two minutes of downtime that looked like nothing happened (2026-09-24)
+    calls = []
+    sw, env = make(tmp_path, calls)
+    with pytest.raises(RuntimeError, match="already"):
+        sw.switch("Qwen/Qwen3-8B-FP8", "pw", current="Qwen/Qwen3-8B-FP8")
+    assert not env.exists() and calls == [] and sw.switching is None

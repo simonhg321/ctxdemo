@@ -25,6 +25,12 @@ def tl_loader(model_name: str, device: str):
         def forward(self, ids):
             toks = torch.tensor([ids], device=device)
             _, cache = self.m.run_with_cache(toks)
+            try:
+                return self._read(cache)
+            finally:
+                del cache                                                   # free the activations before the allocator is asked to release
+
+        def _read(self, cache):
             tops, attn = [], []
             for i in range(self.n_layers):
                 h = cache[f"blocks.{i}.hook_resid_post"][0, -1:].unsqueeze(0)
@@ -37,16 +43,32 @@ def tl_loader(model_name: str, device: str):
     return TLRunner()
 
 
+def cuda_release():
+    """Hand the activation cache back to the driver. run_with_cache keeps every layer's activations and attention
+    patterns; torch's allocator then holds those blocks as reserved, and over a day of questions the sidecar grew from
+    8 GB to 28 GB until vLLM could no longer restart beside it (2026-09-24)."""
+    import torch
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 class Engine:
-    def __init__(self, model_name: str, device: str = "cuda", loader=None):
+    def __init__(self, model_name: str, device: str = "cuda", loader=None, release=None):
         self.model_name, self.device = model_name, device
         self.runner = (loader or tl_loader)(model_name, device)
+        self._release = release if release is not None else (cuda_release if str(device).startswith("cuda") else (lambda: None))
 
     @property
     def n_layers(self) -> int:
         return self.runner.n_layers
 
     def analyze(self, messages=None, prompt=None, prefix: str = "", top_k: int = 5, max_tokens: int = 1536) -> dict:
+        try:
+            return self._analyze(messages, prompt, prefix, top_k, max_tokens)
+        finally:
+            self._release()
+
+    def _analyze(self, messages, prompt, prefix, top_k, max_tokens) -> dict:
         tok = self.runner.tokenizer
         if messages:
             text = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True, enable_thinking=False) + prefix

@@ -13,6 +13,7 @@ services:
     environment:
       - LAYERS_MODEL=${LAYERS_MODEL:-Qwen/Qwen3-4B}
       - HF_HUB_DISABLE_TELEMETRY=1
+      - PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True   # less fragmentation; the engine also empties the cache after every pass
     deploy:
       resources:
         reservations:

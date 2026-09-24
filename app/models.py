@@ -53,12 +53,14 @@ class Switcher:
         return {"current": current, "switching": self.switching, "enabled": self.enabled, "error": self.last_error,
                 "models": [{**m, "cached": self._cached(m["id"]), "current": m["id"] == current} for m in self.models]}
 
-    def switch(self, model_id: str, password: str) -> dict:
+    def switch(self, model_id: str, password: str, current: str | None = None) -> dict:
         if not self.enabled or password != self.password:
             raise PermissionError("wrong password")
         m = self.info(model_id)
         if not m:
             raise ValueError("not in the list")
+        if current is not None and model_id == current:
+            raise RuntimeError("already on that model")   # a same-model restart is two minutes of downtime for nothing
         with self._lock:
             if self.switching:
                 raise RuntimeError("a switch is already running")

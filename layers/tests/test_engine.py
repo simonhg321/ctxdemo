@@ -62,3 +62,16 @@ def test_analyze_attention_dedup_when_decided_at_equals_last():
     r = engine.analyze(messages=[{"role": "user", "content": "hi"}], prefix="X")
     assert r["decided_at"] == 3
     assert [a["layer"] for a in r["attention"]] == [1, 3]
+
+
+def test_analyze_releases_the_gpu_cache_after_every_pass_even_on_error():
+    # 2026-09-24: the sidecar grew from 8 GB to 28 GB over a day of Monty Hall questions (run_with_cache activations kept
+    # by torch's caching allocator) and vLLM could no longer restart. Every analyze() must hand memory back.
+    calls = []
+    engine = Engine("stub/model", device="cpu", loader=lambda n, d: StubRunner(), release=lambda: calls.append(1))
+    engine.analyze(prompt="hello")
+    assert calls == [1]
+    import pytest
+    with pytest.raises(ValueError):
+        engine.analyze()
+    assert calls == [1, 1]

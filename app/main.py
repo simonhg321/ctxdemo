@@ -172,7 +172,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     @app.post("/api/model")
     def set_model(req: ModelReq = Body(...)):
         try:
-            return switcher.switch(req.id, req.password)
+            return switcher.switch(req.id, req.password, current=current_model())
         except PermissionError:
             raise HTTPException(403, "wrong password")
         except ValueError:
