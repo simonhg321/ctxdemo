@@ -155,7 +155,7 @@ class Session:
             log.warning("extract failed: %s: %s", type(e).__name__, e)
             return empty, 0, 0, 0.0
 
-    def turn(self, user_text: str) -> TurnResult:
+    def turn(self, user_text: str, sampling: dict | None = None) -> TurnResult:
         n = self.n + 1
         typed = len(user_text.split())
         event = event_text = None
@@ -183,7 +183,8 @@ class Session:
         sent = new = 0
         secs = 0.0
         uses: list[dict] = []
-        r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools, **self._peek_kw())
+        kw = dict(self._peek_kw(), **({"sampling": sampling} if sampling else {}))   # dials ride along only when set: plain sessions call chat() exactly as before
+        r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools, **kw)
         rounds = 0
         while r.tool_calls and self.tools and rounds < MAX_TOOL_ROUNDS:
             rounds += 1
@@ -194,7 +195,7 @@ class Session:
                 result = self.tools.run(fn.get("name", ""), fn.get("arguments", "{}"))
                 uses.append({"name": fn.get("name"), "args": fn.get("arguments"), "result": result})
                 self.transcript.append({"role": "tool", "tool_call_id": tc.get("id", f"call_{rounds}"), "content": result})
-            r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools, **self._peek_kw())
+            r = self.vllm.chat(self.messages, self.cfg.answer_max_tokens, tools=tools, **kw)
         sent += r.prompt_tokens; new += r.completion_tokens; secs += r.seconds
         self.transcript.append({"role": "assistant", "content": r.text})
         delta, xp, xc, xs = self._extract(n, user_text, r.text)

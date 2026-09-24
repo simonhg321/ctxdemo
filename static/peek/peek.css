@@ -102,3 +102,12 @@ mark { background: rgba(242,169,59,.35); color: var(--bone); border-radius: .2em
 #panel.layers .lheat { display: flex; flex-direction: column; gap: .4em; min-height: 0; overflow: auto; }
 #panel.layers #heat { line-height: 1.7; font-size: .9em; } #panel.layers .hcell { padding: .05em .15em; border-radius: .2em; white-space: pre; }
 #panel.layers .linkish { font-size: .8em; padding: .1em .4em; }
+
+/* the temperature card's live dials */
+#sampling-controls { margin-top: .8em; padding-top: .6em; border-top: 1px solid var(--line); }
+#sampling-controls .dial { display: grid; grid-template-columns: 8em 1fr 3.5em; gap: .3em .8em; align-items: center; margin: .35em 0; }
+#sampling-controls .dial-name { font-weight: 600; }
+#sampling-controls .dial-val { text-align: right; font-variant-numeric: tabular-nums; }
+#sampling-controls .dial-hint { grid-column: 2 / -1; font-size: .8em; margin-top: -.2em; }
+#sampling-controls input[type=range] { width: 100%; accent-color: var(--amber, #d9a441); }
+#sampling-controls .dial-foot { display: flex; gap: 1em; align-items: center; justify-content: space-between; margin-top: .6em; flex-wrap: wrap; }

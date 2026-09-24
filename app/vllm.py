@@ -68,6 +68,31 @@ def parse_logprobs(choice: dict | None) -> list[dict]:
         return []
 
 
+SAMPLING_BOUNDS = {"temperature": (0.0, 2.0, 0.0), "top_p": (0.01, 1.0, 1.0), "top_k": (1, 200, -1), "repetition_penalty": (0.5, 2.0, 1.0)}
+
+
+def clamp_sampling(s: dict | None) -> dict | None:
+    """The temperature card's dials, bounded for vLLM; keys at their default are dropped, so all-default is None = the greedy request we always sent.
+    top_k 0 or below means off (-1). Unknown keys and non-numbers are ignored."""
+    if not s:
+        return None
+    out: dict = {}
+    for k, (lo, hi, default) in SAMPLING_BOUNDS.items():
+        if k not in s:
+            continue
+        try:
+            v = float(s[k])
+        except (TypeError, ValueError):
+            continue
+        if k == "top_k":
+            v = -1 if v < 1 else int(min(hi, v))
+        else:
+            v = round(min(hi, max(lo, v)), 3)
+        if v != default:
+            out[k] = v
+    return out or None
+
+
 def trim_wire(wire: dict | None, keep: int = 40) -> dict | None:
     """The wire for the wall: keep the request whole, cut the response's per-piece list to the first `keep`
     (a 3k-piece answer is ~300 KB of logprobs) and say how many there were. Copies; never mutates."""
@@ -152,9 +177,11 @@ class VLLM:
                           tokens=parse_logprobs(choice), cut=choice.get("finish_reason") == "length",
                           wire={"request": body, "response": j})
 
-    def chat(self, messages: list[dict], max_tokens: int, tools: list[dict] | None = None, peek: bool = False) -> ChatResult:
+    def chat(self, messages: list[dict], max_tokens: int, tools: list[dict] | None = None, peek: bool = False, sampling: dict | None = None) -> ChatResult:
         body = {"model": self.model, "messages": messages, "max_tokens": max_tokens, "temperature": 0,
                 "chat_template_kwargs": {"enable_thinking": False}}
+        if sampling:                               # the temperature card's dials (already clamped); vLLM takes top_k / repetition_penalty as plain fields
+            body.update(sampling)
         if tools:
             body["tools"] = tools
         if peek:                                   # ask for the ranked guesses behind every piece (act 6)

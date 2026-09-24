@@ -2,10 +2,10 @@
 // Nothing is instrumented inside vLLM: two flags in a standard OpenAI-style request ask it to keep the numbers it
 // already computed. Before the first turn the left side shows the request that WOULD go for the current persona.
 peekPanels.wire = (function () {
-  let el, model = 'the model', persona = null, wire = null;
+  let el, model = 'the model', persona = null, wire = null, sampling = null;
   function draft() {
     const p = peekBus.last('persona') || persona;
-    return peekLib.wireDraft(model, p ? p.prompt : '(the persona’s instructions go here)', '(your question goes here)');
+    return peekLib.wireDraft(model, p ? p.prompt : '(the persona’s instructions go here)', '(your question goes here)', sampling);
   }
   function render() {
     const req = el.querySelector('#req'), resp = el.querySelector('#resp'), note = el.querySelector('#note');
@@ -36,6 +36,7 @@ peekPanels.wire = (function () {
       document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
       fetch('../../api/health').then(r => r.json()).then(h => { if (h.model) model = h.model; render(); }).catch(render);   // relative: /demo/ prefix
       peekBus.on('persona', d => { persona = d; if (!wire) render(); });
+      peekBus.on('sampling', d => { sampling = d; if (!wire) render(); });
       render();
     },
     onTurn(msg) { wire = (msg && msg.turn && msg.turn.wire) || null; render(); },

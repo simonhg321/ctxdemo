@@ -50,12 +50,36 @@
   }
   // act 6, wire panel: the body the driver would post for this persona + question — the same shape app/vllm.py builds
   // (peek session, persona leash 10,000). Shown before the first turn so the room can see the two flags without waiting.
-  function wireDraft(model, systemPrompt, userText) {
+  function wireDraft(model, systemPrompt, userText, sampling) {
     const messages = [];
     if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
     messages.push({ role: 'user', content: userText });
-    return { model, messages, max_tokens: 10000, temperature: 0, chat_template_kwargs: { enable_thinking: false }, logprobs: true, top_logprobs: 5 };
+    return Object.assign({ model, messages, max_tokens: 10000, temperature: 0, chat_template_kwargs: { enable_thinking: false }, logprobs: true, top_logprobs: 5 }, cleanSampling(sampling) || {});
   }
+  // the temperature card's dials. cleanSampling mirrors app/vllm.py clamp_sampling's "defaults dropped, all-default = null (greedy)".
+  const SAMPLING_DEFAULT = { temperature: 0, top_p: 1, top_k: -1, repetition_penalty: 1 };
+  function cleanSampling(s) {
+    if (!s) return null;
+    const out = {};
+    for (const k of Object.keys(SAMPLING_DEFAULT)) {
+      if (s[k] === undefined || s[k] === null || s[k] === '') continue;
+      const v = Number(s[k]); if (!isFinite(v)) continue;
+      const vv = k === 'top_k' ? (v < 1 ? -1 : Math.round(v)) : v;
+      if (vv !== SAMPLING_DEFAULT[k]) out[k] = vv;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+  function samplingLine(s) {
+    const c = cleanSampling(s); if (!c) return 'greedy';
+    const parts = [];
+    if (c.temperature !== undefined) parts.push('temperature ' + c.temperature);
+    if (c.top_p !== undefined) parts.push('top-p ' + c.top_p);
+    if (c.top_k !== undefined) parts.push('top-k ' + c.top_k);
+    if (c.repetition_penalty !== undefined) parts.push('repeat penalty ' + c.repetition_penalty);
+    return parts.join(' · ');
+  }
+  // CTXDEMO_FREETEXT -> /api/health.freetext: may this browser type its own questions (and custom personas)?
+  const freetextAllows = (mode, unlocked) => (mode === 'off' ? false : mode === 'password' ? !!unlocked : true);
   // Pretty JSON as safe HTML with the probability keys wrapped in <mark> — the two we ask with, the two that answer.
   function wireHighlight(obj) {
     if (obj == null) return '';
@@ -64,7 +88,10 @@
   }
   // the "try asking" buttons. Long ones (~2–3k tokens) are for the presenter's wall only: on a shared GPU they jam the room.
   const ASKS_SHORT = ['Pick a number between 1 and 10', 'Divide by 3 in C using only shifts',
-    'Monty Hall, but the host opens a door at random and it happens to be a goat. Should I switch?', 'How many r\'s are in strawberry?'];
+    'Monty Hall, but the host opens a door at random and it happens to be a goat. Should I switch?', 'How many r\'s are in strawberry?',
+    'Write a Python function that tells if a string is a palindrome', 'What does x & (x - 1) do, and why would anyone write it?',
+    'Find the bug: for i in range(len(a)): if a[i] == a[i+1]: print(i)',
+    'A haiku about a GPU that is bored', 'A two-sentence ghost story set in a server room'];
   const ASKS_LONG = ['List every country in the world with its capital',
     'Every US president in order, with years and one thing each is remembered for',
     'Explain how TCP delivers a file, step by step, from SYN to the last ACK'];
@@ -121,6 +148,6 @@
   // persona panel: a short box (e.g. ?with=layers gives it 30% of the wall) shows titles only, two columns, so all personas stay reachable.
   // Unmeasured (0) is never dense: a first paint with no size must not flash the dense layout.
   function personaFit(heightPx, count) { return heightPx && heightPx < count * 48 + 110 ? 'dense' : 'full'; }
-  const api = { setVocab, words, plainText, fillVars, chipsFor, personaFit, queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
+  const api = { setVocab, words, plainText, fillVars, chipsFor, cleanSampling, samplingLine, freetextAllows, personaFit, queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.peekLib = api;
 })(typeof window !== 'undefined' ? window : globalThis);

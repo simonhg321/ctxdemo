@@ -8,7 +8,7 @@ from . import config, script as script_mod
 from .session import Session, SYSTEM, SYSTEM_BOARD, SYSTEM_MAP
 from .personas import load as load_personas
 from .jobs import RaceJob
-from .vllm import VLLM
+from .vllm import VLLM, clamp_sampling
 from .tools import Tools
 from .chunks import Chunker
 from .turnlog import TurnLog, hesitations
@@ -66,6 +66,11 @@ class TurnReq(BaseModel):
     text: str | None = None
     source: str | None = None    # "typed" (default) or "voice" — only for the turn log
     name: str | None = None      # NFCU: optional first name for the presenter's room feed (and the turn log)
+    sampling: dict | None = None  # the temperature card's dials: temperature / top_p / top_k / repetition_penalty (clamped server-side; None = greedy)
+
+
+class UnlockReq(BaseModel):
+    password: str
 
 
 class SessReq(BaseModel):
@@ -142,7 +147,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     @app.get("/api/health")
     def health(request: Request):
         return {"vllm": "ok" if vllm.health() else "down", "model": current_model(), "window_tokens": cfg.window_tokens,
-                "audience": is_audience(request), "room": cfg.room, "host": cfg.host_blurb, "switching": switcher.switching, "vocab": cfg.vocab,
+                "audience": is_audience(request), "room": cfg.room, "host": cfg.host_blurb, "freetext": cfg.freetext, "switching": switcher.switching, "vocab": cfg.vocab,
                 "tools_ok": (switcher.info(current_model()) or {"tools": True})["tools"],
                 "vision": "ok" if vision.health() else "down", "vision_model": getattr(vision, "model", cfg.model),
                 "exact_counts": getattr(vllm, "exact", True), "board_window": cfg.board_window,
@@ -168,6 +173,15 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     class LayersReq(BaseModel):
         session_id: str
         index: int | None = None     # which token of the last answer; None/0 = the first
+
+    @app.post("/api/unlock")
+    def unlock(req: UnlockReq = Body(...)):
+        """CTXDEMO_FREETEXT=password: does this password open the typed-question box? Read-only on purpose: checking a credential must never
+        restart the model (last night's incident was a same-model 'switch' used as a password check)."""
+        pw = getattr(switcher, "password", "") or cfg.admin_password
+        if not pw or req.password != pw:
+            raise HTTPException(403, "wrong password")
+        return {"ok": True}
 
     @app.post("/api/model")
     def set_model(req: ModelReq = Body(...)):
@@ -281,7 +295,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
             text, asks = t.user, t.asks
             s.script_pos += 1
         try:
-            tr = s.turn(text)
+            tr = s.turn(text, sampling=clamp_sampling(req.sampling))
         except Exception as e:
             raise HTTPException(502, f"model server error: {type(e).__name__}: {e}")
         d = tr.to_dict()

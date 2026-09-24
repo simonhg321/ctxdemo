@@ -16,8 +16,8 @@ class FakeVLLM:
     def count(self, text): return len((text or "").split())
     def count_messages(self, messages): return sum(self.count(text_of(m.get("content"))) + 4 for m in messages)
 
-    def chat(self, messages, max_tokens, tools=None, peek=False):
-        self.calls.append({"messages": [dict(m) for m in messages], "max_tokens": max_tokens, "tools": tools, "peek": peek})
+    def chat(self, messages, max_tokens, tools=None, peek=False, sampling=None):
+        self.calls.append({"messages": [dict(m) for m in messages], "max_tokens": max_tokens, "tools": tools, "peek": peek, "sampling": sampling})
         nxt = self.responses.pop(0) if self.responses else "Echo: " + text_of(messages[-1].get("content"))
         if isinstance(nxt, ChatResult):
             nxt.prompt_tokens = self.count_messages(messages); return nxt
@@ -26,6 +26,7 @@ class FakeVLLM:
         if peek:   # the same two documents the real client keeps
             body = {"model": self.model, "messages": [dict(m) for m in messages], "max_tokens": max_tokens, "temperature": 0,
                     "chat_template_kwargs": {"enable_thinking": False}, "logprobs": True, "top_logprobs": 5}
+            if sampling: body.update(sampling)
             resp = {"choices": [{"message": {"content": nxt}, "finish_reason": "stop",
                                  "logprobs": {"content": [{"token": w, "logprob": -0.105, "top_logprobs": []} for w in nxt.split()]}}],
                     "usage": {"prompt_tokens": self.count_messages(messages), "completion_tokens": self.count(nxt)}}

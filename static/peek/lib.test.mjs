@@ -98,9 +98,11 @@ test('wireHighlight: pretty JSON, HTML-escaped, the logprob keys marked', () => 
   assert.ok(html.includes('&lt;b&gt;&amp;') && !html.includes('<b>'));
   assert.equal(L.wireHighlight(null), '');
 });
-test('asksFor: the audience gets the short questions only; the presenter gets all seven', () => {
+test('asksFor: the audience gets the short questions only (incl. 3 programming + 2 creative); the presenter gets all twelve', () => {
   const all = L.asksFor(false), aud = L.asksFor(true);
-  assert.equal(all.length, 7); assert.ok(aud.length >= 4 && aud.length < all.length);
+  assert.equal(all.length, 12); assert.ok(aud.length === 9 && aud.length < all.length);
+  assert.ok(aud.some(a => /palindrome/.test(a)) && aud.some(a => /x & \(x - 1\)/.test(a)) && aud.some(a => /Find the bug/.test(a)));
+  assert.ok(aud.some(a => /haiku/.test(a)) && aud.some(a => /ghost story/.test(a)));
   assert.ok(aud.every(a => all.includes(a)));
   assert.ok(!aud.some(a => /every country|US president|TCP/.test(a)));
   assert.ok(aud.some(a => /Monty Hall/.test(a)));
@@ -165,4 +167,28 @@ test('chipsFor: the layers chip only when the sidecar is up', () => {
   assert.deepEqual(L.chipsFor(files, { layers: 'ok' }), files);
   assert.deepEqual(L.chipsFor(files, { layers: 'off' }), ['10-pieces.md', '60-wall.md']);
   assert.deepEqual(L.chipsFor(files, null), ['10-pieces.md', '60-wall.md']);
+});
+
+test('cleanSampling: numbers only, defaults dropped, all-default is null (greedy)', () => {
+  assert.equal(L.cleanSampling(null), null);
+  assert.equal(L.cleanSampling({ temperature: 0, top_p: 1, top_k: -1, repetition_penalty: 1 }), null);
+  assert.deepEqual(L.cleanSampling({ temperature: '0.6', top_k: '40', top_p: 1 }), { temperature: 0.6, top_k: 40 });
+});
+test('samplingLine: what the chip and status say', () => {
+  assert.equal(L.samplingLine(null), 'greedy');
+  assert.equal(L.samplingLine({ temperature: 0 }), 'greedy');
+  assert.equal(L.samplingLine({ temperature: 0.6 }), 'temperature 0.6');
+  assert.equal(L.samplingLine({ temperature: 0.6, top_p: 0.95, top_k: 40, repetition_penalty: 1.1 }), 'temperature 0.6 · top-p 0.95 · top-k 40 · repeat penalty 1.1');
+});
+test('wireDraft: carries the dials when set, plain greedy otherwise', () => {
+  assert.equal(L.wireDraft('m', '', 'hi').temperature, 0);
+  const d = L.wireDraft('m', '', 'hi', { temperature: 0.6, top_k: 40 });
+  assert.equal(d.temperature, 0.6); assert.equal(d.top_k, 40); assert.equal(d.top_p, undefined);
+});
+test('freetextAllows: on / off / password-until-unlocked', () => {
+  assert.equal(L.freetextAllows('on', false), true);
+  assert.equal(L.freetextAllows('off', true), false);
+  assert.equal(L.freetextAllows('password', false), false);
+  assert.equal(L.freetextAllows('password', true), true);
+  assert.equal(L.freetextAllows(undefined, false), true);   // an old server without the field: as before
 });

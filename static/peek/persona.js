@@ -30,6 +30,11 @@ peekPanels.persona = (function () {
         '<button type="button" id="wire">How do we know? <span class="dim">→ show the actual request</span></button>';
       if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(el);
       fetch('../../api/personas').then(r => r.json()).then(d => { personas = d.personas || []; render(); });   // relative: /demo/ prefix
+      let freetext = 'on', unlocked = false;                  // the custom system prompt is free text too: same gate as the ask box (CTXDEMO_FREETEXT)
+      try { unlocked = sessionStorage.getItem('ctxdemo_unlocked') === '1'; } catch (e) { /* stays locked */ }
+      const gate = () => { const ok = peekLib.freetextAllows(freetext, unlocked); el.querySelector('#custom').style.display = ok ? '' : 'none'; if (!ok) el.querySelector('#custom-form').style.display = 'none'; };
+      fetch('../../api/health').then(r => r.json()).then(h => { freetext = h.freetext || 'on'; gate(); }).catch(() => {});
+      peekBus.on('unlock', () => { unlocked = true; gate(); });
       el.querySelector('#wire').onclick = () => peekBus.send('wire', { open: true });   // wall.html hosts the wire panel as an overlay
       el.querySelector('#custom').onclick = () => {
         const f = el.querySelector('#custom-form'); f.style.display = f.style.display === 'none' ? 'block' : 'none';

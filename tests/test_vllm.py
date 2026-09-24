@@ -173,3 +173,12 @@ def test_refresh_model_keeps_the_configured_one_when_the_server_lists_many():
     v = VLLM("http://x", "mine", transport=httpx.MockTransport(many)); assert v.refresh_model() == "mine"
     one = lambda r: httpx.Response(200, json={"data": [{"id": "served"}]})
     v2 = VLLM("http://x", "configured", transport=httpx.MockTransport(one)); assert v2.refresh_model() == "served"
+
+
+def test_clamp_sampling_bounds_the_dials_and_drops_defaults():
+    from app.vllm import clamp_sampling
+    assert clamp_sampling(None) is None and clamp_sampling({}) is None and clamp_sampling({"temperature": 0}) is None
+    assert clamp_sampling({"temperature": 9, "top_p": 2, "top_k": 0, "repetition_penalty": 0}) == {"temperature": 2.0, "repetition_penalty": 0.5}
+    assert clamp_sampling({"temperature": "0.6", "top_k": 40.7, "junk": 1}) == {"temperature": 0.6, "top_k": 40}
+    assert clamp_sampling({"top_p": 0.0}) == {"top_p": 0.01}
+    assert clamp_sampling({"temperature": "abc"}) is None

@@ -2,7 +2,7 @@
 peekPanels.driver = (function () {
   let el, sid = null, busy = false, lastTurn = null, lastSelect = null, persona = null, web = false, pack = 4096, compact = true;   // web: the web_search tool; window/compact: the backpack size and whether it compacts at 95% (off = overflow on purpose)
   const API = '../../api/';                                  // relative: the app lives under /demo/ behind Caddy
-  let audience = false, room = false, toolsOk = true, switching = null;   // Linode: audience = clamped visitor; room = name box on; toolsOk = model has a tool parser; switching = vLLM restarting
+  let audience = false, room = false, toolsOk = true, switching = null, sampling = null, freetext = 'on', unlocked = false;   // sampling = the temperature card's dials (null = greedy); freetext/unlocked = may this browser type   // Linode: audience = clamped visitor; room = name box on; toolsOk = model has a tool parser; switching = vLLM restarting
   let queueTimer = null;
   const nameOf = () => { const n = el.querySelector('#name'); return n && n.value.trim() ? n.value.trim().slice(0, 24) : undefined; };
   async function watchQueue() {                              // while an answer is in flight: how many others the GPU is serving
@@ -19,10 +19,10 @@ peekPanels.driver = (function () {
     watchQueue(); queueTimer = setInterval(watchQueue, 2000);
     try {
       if (!sid) sid = (await post('session', Object.assign({ mode: compact ? 'compact' : 'endless', board: true, peek: true, tools: web, window: pack }, peekLib.personaSessionFields(persona)))).session_id;
-      const r = await post('turn', { session_id: sid, text, name: nameOf() });
+      const r = await post('turn', Object.assign({ session_id: sid, text, name: nameOf() }, sampling ? { sampling } : {}));
       sendTurn(r);
       const searched = (r.turn.tool_uses || []).map(u => (u.args || {}).query || u.name).join(' · ');
-      status(r.turn.event === 'compacted' ? `the ${peekLib.words().pack} was full — it compacted first` : searched ? 'searched the web: ' + searched : '');
+      status(r.turn.event === 'compacted' ? `the ${peekLib.words().pack} was full — it compacted first` : searched ? 'searched the web: ' + searched : sampling ? peekLib.samplingLine(sampling) : '');
       el.querySelector('#q').value = '';
     } catch (e) { status('error: ' + e.message); if (/no such session/.test(e.message)) sid = null; }   // show the real error; a restart forgets sessions
     clearInterval(queueTimer); queueTimer = null;
@@ -37,6 +37,7 @@ peekPanels.driver = (function () {
     mount(root) {
       el = root;
       el.innerHTML = '<div class="cap">ask the model</div><form id="f" style="display:flex;gap:.5em"><input type="text" id="q" placeholder="type a question" autocomplete="off"><button>Ask</button></form>' +
+        '<div id="lock" style="display:none;gap:.5em;align-items:center;font-size:.9em"><span class="dim" id="lock-msg">typed questions are locked on this wall — tap a prepared one below</span><button type="button" id="unlock">🔒 unlock</button><input type="password" id="unlock-pw" placeholder="password" autocomplete="off" style="display:none;width:auto;flex:0 1 12em"><button type="button" id="unlock-go" style="display:none">Go</button></div>' +
         '<div id="asks" style="display:flex;flex-wrap:wrap;gap:.3em;font-size:.8em"></div><div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;font-size:.9em"><button id="new" type="button">Start over</button><button id="web" type="button" title="give it web search (a fresh session)">🌐 web: off</button><button id="win" type="button" title="context size (a fresh session)">🎒 4k</button><button id="cmp" type="button" title="when 95% full it writes itself a summary and drops the rest; off = let it overflow (a fresh session)">compact: on</button><input type="text" id="name" placeholder="your first name (optional)" maxlength="24" autocomplete="off" style="width:auto;flex:0 1 14em;display:none" title="shows next to your questions on the presenter\'s screen"><span id="st" class="dim"></span></div>';
       const drawAsks = () => {
         const box = el.querySelector('#asks'); box.innerHTML = '';
@@ -46,7 +47,25 @@ peekPanels.driver = (function () {
         el.querySelector('#name').style.display = room ? '' : 'none';                                              // the name box feeds the room panel
       };
       drawAsks();
-      const applyHealth = h => { audience = !!h.audience; room = !!h.room; toolsOk = h.tools_ok !== false; drawAsks(); };
+      const applyHealth = h => { audience = !!h.audience; room = !!h.room; toolsOk = h.tools_ok !== false; freetext = h.freetext || 'on'; drawAsks(); gate(); };
+      try { unlocked = sessionStorage.getItem('ctxdemo_unlocked') === '1'; } catch (e) { /* private window: stays locked */ }
+      const gate = () => {                                   // CTXDEMO_FREETEXT: the typed box is on, off, or behind the model-switch password
+        const ok = peekLib.freetextAllows(freetext, unlocked);
+        el.querySelector('#f').style.display = ok ? '' : 'none';
+        const lock = el.querySelector('#lock'); lock.style.display = ok || freetext === 'off' ? 'none' : 'flex';
+        if (freetext === 'off') { lock.style.display = 'flex'; el.querySelector('#unlock').style.display = 'none'; }
+      };
+      el.querySelector('#unlock').onclick = () => { ['#unlock-pw', '#unlock-go'].forEach(s => { el.querySelector(s).style.display = ''; }); el.querySelector('#unlock-pw').focus(); };
+      const tryUnlock = async () => {
+        try {
+          await post('unlock', { password: el.querySelector('#unlock-pw').value });   // read-only check: never the model endpoint
+          unlocked = true; try { sessionStorage.setItem('ctxdemo_unlocked', '1'); } catch (e) { /* fine */ }
+          peekBus.send('unlock', {}); gate(); status('typed questions unlocked for this browser');
+        } catch (e) { el.querySelector('#lock-msg').textContent = e.message; }
+      };
+      el.querySelector('#unlock-go').onclick = tryUnlock;
+      el.querySelector('#unlock-pw').onkeydown = e => { if (e.key === 'Enter') tryUnlock(); };
+      peekBus.on('sampling', d => { sampling = peekLib.cleanSampling(d); if (!busy) status(sampling ? peekLib.samplingLine(sampling) : 'greedy again — the most likely token every time'); });
       fetch(API + 'health').then(r => r.json()).then(applyHealth).catch(() => {});
       peekBus.on('model', d => {                               // the tiles panel polls /api/models and relays: lock the ask box during a switch
         const wasSwitching = !!switching; switching = d.switching || null;
@@ -73,6 +92,7 @@ peekPanels.driver = (function () {
       });
       peekBus.on('hello', () => {                              // a panel opened late: repeat the last turn (and persona) for it
         if (persona) peekBus.send('persona', persona);
+        if (unlocked) peekBus.send('unlock', {});
         if (!lastTurn) return;
         const s = lastSelect;
         peekBus.send('turn', lastTurn); if (s) peekBus.send('select', s);

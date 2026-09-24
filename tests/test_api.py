@@ -548,3 +548,41 @@ def test_layers_layout_scales_the_short_right_column_panels(client):
     src = client.get("/static/peek/wall.html").text
     assert "almost: [64, 30, 34, 20, 1.35]" in src and "layers: [64, 51, 34, 27, 1.3]" in src
     assert "&scale=" in src
+
+
+def test_turn_sampling_reaches_the_model_clamped_and_greedy_stays_the_default(fake, cfg):
+    # the temperature card's dials travel with each question; greedy (all defaults) sends exactly the request we always sent
+    c = TestClient(create_app(vllm=fake, cfg=cfg))
+    sid = c.post("/api/session", json={"mode": "endless", "board": True, "peek": True}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    assert fake.calls[-1].get("sampling") is None
+    t = c.post("/api/turn", json={"session_id": sid, "text": "hi", "sampling": {"temperature": 0.6, "top_p": 0.95, "top_k": 40, "repetition_penalty": 1.1}}).json()["turn"]
+    assert fake.calls[-1]["sampling"] == {"temperature": 0.6, "top_p": 0.95, "top_k": 40, "repetition_penalty": 1.1}
+    assert t["wire"]["request"]["temperature"] == 0.6 and t["wire"]["request"]["top_k"] == 40        # "how do we know" shows the dials
+    c.post("/api/turn", json={"session_id": sid, "text": "hi", "sampling": {"temperature": 9, "top_p": 2, "top_k": 0, "repetition_penalty": 0, "junk": 5}})
+    assert fake.calls[-1]["sampling"] == {"temperature": 2.0, "repetition_penalty": 0.5}              # clamped; defaults dropped; unknown keys ignored
+    c.post("/api/turn", json={"session_id": sid, "text": "hi", "sampling": {"temperature": 0, "top_p": 1, "top_k": -1, "repetition_penalty": 1}})
+    assert fake.calls[-1].get("sampling") is None
+
+
+def test_freetext_mode_reaches_health_and_unlock_is_read_only(fake, cfg, tmp_path, monkeypatch):
+    # NFCU: the typed-question box is off, on, or behind the model-switch password; checking the password must never touch the model
+    from app.config import load
+    assert load().freetext == "on"
+    monkeypatch.setenv("CTXDEMO_FREETEXT", "password"); assert load().freetext == "password"
+    monkeypatch.setenv("CTXDEMO_FREETEXT", "off"); assert load().freetext == "off"
+    monkeypatch.setenv("CTXDEMO_FREETEXT", "weird"); assert load().freetext == "on"
+    from app.models import Switcher
+    from dataclasses import replace
+    env = tmp_path / ".env"; env.write_text("MODEL=x\n")
+    sw = Switcher(models=[{"id": "fake", "label": "Fake", "note": "", "args": "", "tools": True, "tokenizer": "x"}],
+                  env_file=env, compose_dir=tmp_path, hub_dir=tmp_path, password="pw")
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, freetext="password", admin_password="pw"), switcher=sw))
+    assert c.get("/api/health").json()["freetext"] == "password"
+    assert c.post("/api/unlock", json={"password": "nope"}).status_code == 403
+    assert c.post("/api/unlock", json={"password": "pw"}).json() == {"ok": True}
+    assert env.read_text() == "MODEL=x\n" and sw.switching is None
+    for f in ("driver.js", "persona.js"):
+        assert "freetext" in c.get(f"/static/peek/{f}").text, f                                        # both free-text boxes obey the mode
+    assert "sampling" in c.get("/static/peek/explain.js").text and "sampling" in c.get("/static/peek/driver.js").text
+    assert "dials" in c.get("/static/peek/explain/04-temperature.md").text.lower()
