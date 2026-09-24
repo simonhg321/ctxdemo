@@ -36,7 +36,7 @@ test('personaModel: marks the active persona, custom handled elsewhere', () => {
   assert.deepEqual(L.personaModel(undefined, 'x'), []);
 });
 test('personaSessionFields: persona id, or custom free text', () => {
-  assert.deepEqual(L.personaSessionFields(null), { max_tokens: 10000 });      // no persona still gets the long leash: the president list is ~2,700 tokens
+  assert.deepEqual(L.personaSessionFields(null), { persona: 'wall', max_tokens: 10000 });   // no pick = the wall.md persona (not the server's camera prompt); long leash: the president list is ~2,700 tokens
   assert.deepEqual(L.personaSessionFields({ id: 'pirate', prompt: 'Arr' }), { persona: 'pirate', max_tokens: 10000 });
   assert.deepEqual(L.personaSessionFields({ id: 'custom', prompt: 'be nice' }), { system: 'be nice', max_tokens: 10000 });
 });

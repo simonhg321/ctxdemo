@@ -557,10 +557,12 @@ def test_turn_sampling_reaches_the_model_clamped_and_greedy_stays_the_default(fa
     c.post("/api/turn", json={"session_id": sid, "text": "hi"})
     assert fake.calls[-1].get("sampling") is None
     t = c.post("/api/turn", json={"session_id": sid, "text": "hi", "sampling": {"temperature": 0.6, "top_p": 0.95, "top_k": 40, "repetition_penalty": 1.1}}).json()["turn"]
-    assert fake.calls[-1]["sampling"] == {"temperature": 0.6, "top_p": 0.95, "top_k": 40, "repetition_penalty": 1.1}
-    assert t["wire"]["request"]["temperature"] == 0.6 and t["wire"]["request"]["top_k"] == 40        # "how do we know" shows the dials
+    got = dict(fake.calls[-1]["sampling"]); seed = got.pop("seed")
+    assert got == {"temperature": 0.6, "top_p": 0.95, "top_k": 40, "repetition_penalty": 1.1} and isinstance(seed, int)   # a fresh seed rides along (vLLM runs seed=0)
+    assert t["wire"]["request"]["temperature"] == 0.6 and t["wire"]["request"]["top_k"] == 40 and t["wire"]["request"]["seed"] == seed   # "how do we know" shows the dials
     c.post("/api/turn", json={"session_id": sid, "text": "hi", "sampling": {"temperature": 9, "top_p": 2, "top_k": 0, "repetition_penalty": 0, "junk": 5}})
-    assert fake.calls[-1]["sampling"] == {"temperature": 2.0, "repetition_penalty": 0.5}              # clamped; defaults dropped; unknown keys ignored
+    got = dict(fake.calls[-1]["sampling"]); got.pop("seed")
+    assert got == {"temperature": 2.0, "repetition_penalty": 0.5}                                      # clamped; defaults dropped; unknown keys ignored
     c.post("/api/turn", json={"session_id": sid, "text": "hi", "sampling": {"temperature": 0, "top_p": 1, "top_k": -1, "repetition_penalty": 1}})
     assert fake.calls[-1].get("sampling") is None
 

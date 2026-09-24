@@ -295,7 +295,10 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
             text, asks = t.user, t.asks
             s.script_pos += 1
         try:
-            tr = s.turn(text, sampling=clamp_sampling(req.sampling))
+            samp = clamp_sampling(req.sampling)
+            if samp:
+                samp["seed"] = random.randrange(1 << 31)    # vLLM serves with seed=0: without this, "ask twice" at temperature 1 repeats verbatim
+            tr = s.turn(text, sampling=samp)
         except Exception as e:
             raise HTTPException(502, f"model server error: {type(e).__name__}: {e}")
         d = tr.to_dict()
