@@ -7,4 +7,6 @@ The model is a stack of **layers** — a few dozen in the sibling this wall read
 
 Tap any piece of the answer and the column shows how *that* piece formed. Red pieces are decided late.
 
+**Why the Chinese?** This model was raised bilingual, on a great deal of Chinese and English. In the early and middle layers the thought is not in any language yet — it is closer to an idea — and when the wall forces that half-formed thought into a word, the nearest word is often the Chinese one: 是 before `Yes`. Somewhere past the middle the English word takes over and stays. The model has the idea before it has the language, and this one's first language is Chinese.
+
 Honesty note: the layers you see belong to a **4B sibling** of the model that answered — same family, same design, smaller. When the two disagree the panel says so; that disagreement is a lesson too.
