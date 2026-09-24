@@ -37,6 +37,8 @@ input[type=text] { width: 100%; }
 #panel.persona .persona-btn { display: block; width: 100%; text-align: left; }
 #panel.persona .persona-btn .t { font-weight: 600; }
 #panel.persona .persona-btn .b { font-size: .75em; margin-top: .15em; }
+#panel.persona.dense .persona-list { display: grid; grid-template-columns: 1fr 1fr; gap: .3em; align-content: start; }
+#panel.persona.dense .persona-btn .b { display: none; }
 #panel.persona .persona-btn.active, #panel.persona #custom.active { border-color: var(--ice); box-shadow: inset 0 0 0 .07em var(--ice); }
 #panel.persona textarea { font: inherit; color: var(--bone); background: var(--panel); border: 1px solid var(--line); border-radius: .25em; padding: .4em .7em; width: 100%; resize: vertical; }
 #panel.persona #custom-form { display: flex; flex-direction: column; gap: .4em; }

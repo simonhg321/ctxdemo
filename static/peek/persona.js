@@ -4,11 +4,14 @@ peekPanels.persona = (function () {
   function render() {
     const btns = el.querySelector('#btns');
     btns.innerHTML = peekLib.personaModel(personas, active).map(p =>
-      `<button type="button" class="persona-btn${p.active ? ' active' : ''}" data-id="${p.id}">` +
+      `<button type="button" class="persona-btn${p.active ? ' active' : ''}" data-id="${p.id}" title="${String(p.blurb).replace(/"/g, '&quot;')}">` +
       `<div class="t">${p.title}</div><div class="b dim">${p.blurb}</div></button>`).join('');
     btns.querySelectorAll('button').forEach(b => b.onclick = () => pick(b.dataset.id));
     el.querySelector('#custom').classList.toggle('active', active === 'custom');
+    fit();
   }
+  // short box (the layers layout): titles only in two columns; the blurb survives as a tooltip
+  function fit() { el.classList.toggle('dense', peekLib.personaFit(el.clientHeight, personas.length || 7) === 'dense'); }
   function pick(id) {
     const p = personas.find(p => p.id === id); if (!p) return;
     active = id;
@@ -25,6 +28,7 @@ peekPanels.persona = (function () {
         '<textarea id="custom-text" rows="3" placeholder="system prompt"></textarea>' +
         '<button type="button" id="use">Use it</button></div>' +
         '<button type="button" id="wire">How do we know? <span class="dim">→ show the actual request</span></button>';
+      if (typeof ResizeObserver !== 'undefined') new ResizeObserver(fit).observe(el);
       fetch('../../api/personas').then(r => r.json()).then(d => { personas = d.personas || []; render(); });   // relative: /demo/ prefix
       el.querySelector('#wire').onclick = () => peekBus.send('wire', { open: true });   // wall.html hosts the wire panel as an overlay
       el.querySelector('#custom').onclick = () => {

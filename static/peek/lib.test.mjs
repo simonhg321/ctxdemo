@@ -148,3 +148,9 @@ test('attentionHeat: pairs tokens with the chosen attention row', () => {
   assert.equal(L.attentionHeat({ ...RESP, decided_at: 99 }, 'decided').layer, 4);     // no matching row: the last one
   assert.deepEqual(L.attentionHeat(null, 'decided'), { layer: null, cells: [] });
 });
+test('personaFit: a short persona box goes dense (titles only, two columns); a tall one keeps the blurbs', () => {
+  assert.equal(L.personaFit(309, 7), 'dense');    // ?with=layers on a 1080p wall: 30% of the frame
+  assert.equal(L.personaFit(480, 7), 'full');     // the default layout: 46%
+  assert.equal(L.personaFit(309, 3), 'full');     // few personas fit even in a short box
+  assert.equal(L.personaFit(0, 7), 'full');       // not measured yet (display:none, first paint): never guess dense
+});

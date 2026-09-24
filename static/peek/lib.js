@@ -107,6 +107,9 @@
       : (rows.find(r => r.layer === resp.decided_at) || rows[rows.length - 1]);
     return { layer: row.layer, cells: (resp.tokens || []).map((t, i) => ({ t, w: row.weights[i] ?? 0 })) };
   }
-  const api = { setVocab, words, plainText, queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
+  // persona panel: a short box (e.g. ?with=layers gives it 30% of the wall) shows titles only, two columns, so all personas stay reachable.
+  // Unmeasured (0) is never dense: a first paint with no size must not flash the dense layout.
+  function personaFit(heightPx, count) { return heightPx && heightPx < count * 48 + 110 ? 'dense' : 'full'; }
+  const api = { setVocab, words, plainText, personaFit, queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.peekLib = api;
 })(typeof window !== 'undefined' ? window : globalThis);
