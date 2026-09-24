@@ -1,0 +1,38 @@
+# vLLM on IIAT-HACLAB-01 — OpenAI-compatible server on 127.0.0.1:8100 (installed at /srv/projects/vllm/docker-compose.yaml)
+#   docker compose up -d        docker compose logs -f        docker compose down
+# The model comes from .env in this directory (MODEL / MODEL_ARGS). The wall's model switch rewrites .env; the host's
+# systemd path unit (deploy/haclab/model-switch-unit.sh) sees the change and recreates this container. The ctxdemo
+# container never touches docker. No --served-model-name: the served id is the repo id, and ctxdemo learns it from /v1/models.
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: vllm
+    restart: unless-stopped
+    ipc: host                                   # vLLM needs shared memory for its workers
+    ports:
+      - "127.0.0.1:8100:8000"                   # localhost
+      - "172.17.0.1:8100:8000"                  # docker bridge, so other containers (ctxdemo, caddy) can reach it
+    volumes:
+      - /mnt/data/hf:/root/.cache/huggingface   # model cache on the big volume (survives container recreation)
+    environment:
+      - HF_HUB_DISABLE_TELEMETRY=1
+      - VLLM_LOGGING_LEVEL=INFO
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: >
+      ${MODEL:-Qwen/Qwen3-8B-FP8}
+      --gpu-memory-utilization 0.40
+      --max-model-len 32768
+      --max-num-seqs 32
+      ${MODEL_ARGS:---reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 60
+      start_period: 120s

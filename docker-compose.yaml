@@ -18,8 +18,13 @@ services:
       - EARS_URL=http://whisper:8300
       - HF_HUB_OFFLINE=1
       - CTXDEMO_TURNLOG=/srv/data/logs/turns.jsonl   # every question + answer, on the data volume; REMOVE this line for an audience that must not be logged
+      - CTXDEMO_ADMIN_PASSWORD=${CTXDEMO_ADMIN_PASSWORD:-}   # the model switch (from ./.env, gitignored; empty = switching off)
+      - CTXDEMO_COMPOSE_DIR=/srv/compose                     # the vllm compose dir, mounted below: the switch writes its .env
+      - CTXDEMO_HF_HUB=/srv/hf/hub                           # to flag which models are already downloaded
     volumes:
       - ./data:/srv/data
+      - /srv/projects/vllm:/srv/compose                      # host: deploy/haclab/vllm-compose.yaml + .env; a root path unit does the restart
+      - /mnt/data/hf/hub:/srv/hf/hub:ro
     depends_on: [whisper]
     logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
 

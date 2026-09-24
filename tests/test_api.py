@@ -499,3 +499,23 @@ def test_chooser_chips_lead_the_explain_bar(client):
         body = client.get(f"/static/peek/explain/{f}").text
         assert body.startswith("# ")
         assert "piece" in body               # wall vocabulary; plainText swaps it to "token" under CTXDEMO_VOCAB=plain
+
+
+def test_model_leash_caps_the_session_max_tokens(fake, cfg, tmp_path):
+    # a model that runs away under greedy decoding (DeepSeek R1) gets a shorter leash in config/models.json: "max_tokens"
+    from app.models import Switcher
+    sw = Switcher(models=[{"id": "fake", "label": "Fake", "note": "", "args": "", "tools": True, "tokenizer": "x", "max_tokens": 2000}],
+                  env_file=tmp_path / ".env", compose_dir=tmp_path, hub_dir=tmp_path, password="pw")
+    c = TestClient(create_app(vllm=fake, cfg=cfg, switcher=sw))
+    sid = c.post("/api/session", json={"mode": "endless", "max_tokens": 10000}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    assert fake.calls[-1]["max_tokens"] == 2000
+    sid = c.post("/api/session", json={"mode": "endless", "max_tokens": 500}).json()["session_id"]   # under the cap: untouched
+    c.post("/api/turn", json={"session_id": sid, "text": "hi"})
+    assert fake.calls[-1]["max_tokens"] == 500
+
+
+def test_deepseek_has_a_short_leash_in_the_allow_list():
+    from app.models import load_models
+    ds = next(m for m in load_models() if "DeepSeek" in m["id"])
+    assert ds["max_tokens"] == 2000

@@ -250,6 +250,9 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         scfg = replace(cfg, window_tokens=board_window) if req.board else cfg
         if req.max_tokens:
             scfg = replace(scfg, answer_max_tokens=max(100, min(10000, req.max_tokens)))
+        leash = (switcher.info(current_model()) or {}).get("max_tokens")   # per-model cap (models.json): a looping model can't burn the whole 10k
+        if leash:
+            scfg = replace(scfg, answer_max_tokens=min(scfg.answer_max_tokens, leash))
         if req.system is not None:                       # custom free text always wins, even "" (no system message)
             system_prompt, persona_label = req.system, "custom"
         elif req.persona is not None:
