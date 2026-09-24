@@ -9,11 +9,12 @@
   }
   function stats(tokens) {
     const real = (tokens || []).map((t, i) => ({ ...t, i })).filter(t => !isBlank(t.t));
-    if (!real.length) return { sure_pct: 0, worst: null };
+    if (!real.length) return { sure_pct: 0, sure_n: 0, n: 0, worst: null };
     const w = real.reduce((a, b) => (b.p < a.p ? b : a));
     const runner = (w.alts || []).find(a => a.t !== w.t);
-    return { sure_pct: Math.round(100 * real.filter(t => t.p >= 0.9).length / real.length),
-             worst: { i: w.i, chosen: w.t, runner: runner ? runner.t : null } };
+    const sure_n = real.filter(t => t.p >= 0.9).length;
+    return { sure_pct: Math.round(100 * sure_n / real.length), sure_n, n: real.length,
+             worst: { i: w.i, chosen: w.t, runner: runner ? runner.t : null, p: w.p, runner_p: runner ? runner.p : null } };
   }
   const revealDelay = (seconds, n) => Math.max(15, Math.round(Math.min(seconds, 8) * 1000 / Math.max(1, n)));
   // act 6, persona panel: the button model (custom is a fixed button the panel draws itself, never in this list).
@@ -83,10 +84,20 @@
   function plainText(text, mode) {
     if ((mode || vocabMode) !== 'plain') return String(text || '');
     return String(text || '')
-      .replace(/ \(the real word is \*tokens\*\)/g, '')
+      .replace(/ \(the real word is \*tokens\*\)/g, '').replace(/; the wall calls it the backpack/g, '')
       .replace(/\bPieces\b/g, 'Tokens').replace(/\bpieces\b/g, 'tokens').replace(/\bPiece\b/g, 'Token').replace(/\bpiece\b/g, 'token')
       .replace(/\bBackpack\b/g, 'Context window').replace(/\bbackpack\b/g, 'context window');
   }
+  // the "this wall" card: {{model}} / {{host}} filled from /api/health so one card serves every venue (short model name; … when unknown)
+  function fillVars(text, vars) {
+    const v = vars || {};
+    return String(text || '').replace(/\{\{(model|host)\}\}/g, (m, k) => {
+      const val = v[k]; if (!val) return '…';
+      return k === 'model' ? String(val).split('/').pop() : String(val);
+    });
+  }
+  // which explain chips to show: the layers chip only where the sidecar is up (the Linode has none)
+  const chipsFor = (files, health) => (files || []).filter(f => !/layers/.test(f) || (health && health.layers === 'ok'));
   // piece 4, layers panel: one chip per layer from the sidecar's response; the final token's tone once a layer agrees with it.
   function layersModel(resp, wallToken) {
     if (!resp || !resp.layers) return { chips: [], decided_at: null, agree: null, sibling: null };
@@ -110,6 +121,6 @@
   // persona panel: a short box (e.g. ?with=layers gives it 30% of the wall) shows titles only, two columns, so all personas stay reachable.
   // Unmeasured (0) is never dense: a first paint with no size must not flash the dense layout.
   function personaFit(heightPx, count) { return heightPx && heightPx < count * 48 + 110 ? 'dense' : 'full'; }
-  const api = { setVocab, words, plainText, personaFit, queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
+  const api = { setVocab, words, plainText, fillVars, chipsFor, personaFit, queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.peekLib = api;
 })(typeof window !== 'undefined' ? window : globalThis);

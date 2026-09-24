@@ -3,14 +3,14 @@
 // Loaded only by wall.html, and only when ?bar=0 is absent.
 (function () {
   const q = new URLSearchParams(location.search), room = q.get('room') || 'wall';
-  let cardsData = [], personas = null, openId = null, closeTimer = null;
+  let cardsData = [], personas = null, openId = null, closeTimer = null, health = null;
 
   const fileId = name => name.replace(/^\d+-/, '').replace(/\.md$/, '');
   const escHtml = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   function renderBlocks(blocks) {
     return blocks.map(b => {
-      if (b.type === 'p') return `<p>${peekLib.explainInline(peekLib.plainText(b.text))}</p>`;
+      if (b.type === 'p') return `<p>${peekLib.explainInline(peekLib.fillVars(peekLib.plainText(b.text), health))}</p>`;
       if (b.type === 'ul') return `<ul>${b.items.map(i => `<li>${peekLib.explainInline(peekLib.plainText(i))}</li>`).join('')}</ul>`;
       if (b.type === 'personas') return '<div id="explain-personas" class="dim">loading…</div>';
       return '';
@@ -82,8 +82,8 @@
   }
 
   async function load() {
-    try { peekLib.setVocab((await (await fetch('../../api/health')).json()).vocab); } catch (e) { /* default words */ }   // relative: /demo/ prefix
-    const files = await (await fetch('explain.json')).json();
+    try { health = await (await fetch('../../api/health')).json(); peekLib.setVocab(health.vocab); } catch (e) { /* default words */ }   // relative: /demo/ prefix
+    const files = peekLib.chipsFor(await (await fetch('explain.json')).json(), health);
     cardsData = await Promise.all(files.map(async name => {
       const text = await (await fetch('explain/' + name)).text();
       const parsed = peekLib.explainParse(text);
@@ -96,6 +96,7 @@
     peekBus.on('clear', () => personaSuffix(null));
     peekBus.on('wire', d => { if (d && d.open) pulse('wire'); });
     peekBus.on('layers', () => pulse('layers'));
+    peekBus.on('model', d => { if (d && !d.switching) fetch('../../api/health').then(r => r.json()).then(h => { health = h; }).catch(() => {}); });   // the card names the running model
     peekBus.send('hello', {});   // late joiner: ask the driver to repeat the current persona (if any)
   }
 

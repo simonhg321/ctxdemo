@@ -142,7 +142,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     @app.get("/api/health")
     def health(request: Request):
         return {"vllm": "ok" if vllm.health() else "down", "model": current_model(), "window_tokens": cfg.window_tokens,
-                "audience": is_audience(request), "room": cfg.room, "switching": switcher.switching, "vocab": cfg.vocab,
+                "audience": is_audience(request), "room": cfg.room, "host": cfg.host_blurb, "switching": switcher.switching, "vocab": cfg.vocab,
                 "tools_ok": (switcher.info(current_model()) or {"tools": True})["tools"],
                 "vision": "ok" if vision.health() else "down", "vision_model": getattr(vision, "model", cfg.model),
                 "exact_counts": getattr(vllm, "exact", True), "board_window": cfg.board_window,

@@ -36,7 +36,7 @@ input[type=text] { width: 100%; }
 #panel.persona .persona-list { display: flex; flex-direction: column; gap: .4em; overflow-y: auto; min-height: 0; }
 #panel.persona .persona-btn { display: block; width: 100%; text-align: left; }
 #panel.persona .persona-btn .t { font-weight: 600; }
-#panel.persona .persona-btn .b { font-size: .75em; margin-top: .15em; }
+#panel.persona .persona-btn .b { font-size: .85em; margin-top: .15em; }
 #panel.persona.dense .persona-list { display: grid; grid-template-columns: 1fr 1fr; gap: .3em; align-content: start; }
 #panel.persona.dense .persona-btn .b { display: none; }
 #panel.persona .persona-btn.active, #panel.persona #custom.active { border-color: var(--ice); box-shadow: inset 0 0 0 .07em var(--ice); }

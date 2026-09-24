@@ -19,8 +19,8 @@ test('hesitations: lowest first, skips blank pieces', () => {
 });
 test('stats', () => {
   const s = L.stats([T('A', 0.99), T('B', 0.4, 'C'), T('D', 0.95)]);
-  assert.equal(s.sure_pct, 67); assert.deepEqual(s.worst, { i: 1, chosen: 'B', runner: 'C' });
-  assert.deepEqual(L.stats([]), { sure_pct: 0, worst: null });
+  assert.equal(s.sure_pct, 67); assert.deepEqual(s.worst, { i: 1, chosen: 'B', runner: 'C', p: 0.4, runner_p: 0.6 }); assert.equal(s.sure_n, 2); assert.equal(s.n, 3);
+  assert.deepEqual(L.stats([]), { sure_pct: 0, sure_n: 0, n: 0, worst: null });
 });
 test('revealDelay: real pace, capped at 8 s total, floor 15 ms', () => {
   assert.equal(L.revealDelay(2, 40), 50); assert.equal(L.revealDelay(30, 100), 80); assert.equal(L.revealDelay(0.01, 100), 15);
@@ -123,7 +123,7 @@ test('words: wall vocabulary vs plain (tokens / context window)', () => {
 test('plainText: rewrites our own prose for the plain vocabulary, leaves it alone for the wall', () => {
   const md = 'Your sentence is chopped into **pieces** (the real word is *tokens*). One piece. The **backpack** is the context window; the wall calls it the backpack.';
   assert.equal(L.plainText(md, 'wall'), md);
-  assert.equal(L.plainText(md, 'plain'), 'Your sentence is chopped into **tokens**. One token. The **context window** is the context window; the wall calls it the context window.');
+  assert.equal(L.plainText(md, 'plain'), 'Your sentence is chopped into **tokens**. One token. The **context window** is the context window.');   // the aside about the wall\'s word is dropped, not translated
   assert.equal(L.plainText('# the backpack', 'plain'), '# the context window');
   assert.equal(L.plainText('Pieces it was sure about · a masterpiece', 'plain'), 'Tokens it was sure about · a masterpiece');   // whole words only
 });
@@ -153,4 +153,16 @@ test('personaFit: a short persona box goes dense (titles only, two columns); a t
   assert.equal(L.personaFit(480, 7), 'full');     // the default layout: 46%
   assert.equal(L.personaFit(309, 3), 'full');     // few personas fit even in a short box
   assert.equal(L.personaFit(0, 7), 'full');       // not measured yet (display:none, first paint): never guess dense
+});
+
+test('fillVars: {{model}} (short name) and {{host}} from health; unknown keys stay, missing values show as …', () => {
+  assert.equal(L.fillVars('The model is **{{model}}**, on {{host}}. {{nope}}', { model: 'Qwen/Qwen3-8B-FP8', host: 'one GPU' }), 'The model is **Qwen3-8B-FP8**, on one GPU. {{nope}}');
+  assert.equal(L.fillVars('{{model}}', {}), '…');
+  assert.equal(L.fillVars('{{model}}', null), '…');
+});
+test('chipsFor: the layers chip only when the sidecar is up', () => {
+  const files = ['10-pieces.md', '45-layers.md', '60-wall.md'];
+  assert.deepEqual(L.chipsFor(files, { layers: 'ok' }), files);
+  assert.deepEqual(L.chipsFor(files, { layers: 'off' }), ['10-pieces.md', '60-wall.md']);
+  assert.deepEqual(L.chipsFor(files, null), ['10-pieces.md', '60-wall.md']);
 });

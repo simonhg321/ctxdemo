@@ -30,6 +30,7 @@ class Config:
     turnlog: str = ""                    # path of a JSONL file that gets every question + answer; empty = log nothing (default)
     vocab: str = "wall"                  # words on the wall: "wall" = pieces/backpack, "plain" = tokens/context window (CTXDEMO_VOCAB)
     audience: bool = False               # NFCU Linode: clamp sessions without an X-Presenter header (4k window, 600-token leash, no tools)
+    host_blurb: str = "a single GPU"    # the "this wall" card: where the model runs (CTXDEMO_HOST_BLURB), per venue
     room: bool = False                   # NFCU: show the optional first-name box (feeds the presenter's room panel)
     netdata_url: str = ""                # NFCU: Netdata agent for /api/gpu (GPU busy % in the tiles); empty = no tile
     layers_url: str = ""                 # piece 4: the "inside the head" sidecar (LAYERS_URL); empty = the layers panel says it is off
@@ -53,6 +54,7 @@ def load(root: Path = ROOT) -> Config:
     demo["audience"] = os.environ.get("CTXDEMO_AUDIENCE") == "1"
     demo["vocab"] = "plain" if os.environ.get("CTXDEMO_VOCAB") == "plain" else "wall"
     demo["room"] = os.environ.get("CTXDEMO_ROOM") == "1"
+    demo["host_blurb"] = os.environ.get("CTXDEMO_HOST_BLURB") or "a single GPU"
     demo["netdata_url"] = os.environ.get("NETDATA_URL", "")
     demo["layers_url"] = os.environ.get("LAYERS_URL", "")
     demo["admin_password"] = os.environ.get("CTXDEMO_ADMIN_PASSWORD", "")

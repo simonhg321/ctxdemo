@@ -7,7 +7,7 @@ peekPanels.answer = (function () {
   return {
     mount(root) {
       el = root;
-      el.innerHTML = '<div class="cap">the answer · <span style="color:var(--moss)">sure</span> · <span style="color:var(--amber)">unsure</span> · <span style="color:var(--red)">coin-flip</span></div><div id="out" class="dim">…</div>';
+      el.innerHTML = '<div class="cap">the answer · <span style="color:var(--moss)" title="90% or more">sure</span> · <span style="color:var(--amber)" title="between 50% and 90%">unsure</span> · <span style="color:var(--red)" title="under 50% — the runner-up was about as likely">coin-flip</span></div><div id="out" class="dim">tap a question above, or type your own</div>';
       el.addEventListener('click', e => {
         const s = e.target.closest('.piece'); if (!s) return;
         window.peekStopCycle && window.peekStopCycle();            // a person took over: stop the automatic tour

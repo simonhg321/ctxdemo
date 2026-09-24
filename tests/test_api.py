@@ -491,14 +491,35 @@ def test_layers_panel_chip_and_wall_slot_are_served(client):
     assert "wall_token" in js
 
 
-def test_chooser_chips_lead_the_explain_bar(client):
-    # act 6 teaching chips for how a token gets picked: they come first so the story starts before "pieces"
+def test_explain_bar_tells_the_story_in_order(client):
+    # a first-time human meets "tokens" before "every token is a bet": tokens -> guesses -> almost said -> the chooser trio -> persona ...
     files = client.get("/static/peek/explain.json").json()
-    assert files[:3] == ["02-chooser.md", "04-temperature.md", "06-loops.md"]
-    for f in files[:3]:
+    assert files[0] == "10-pieces.md" and files[-1] == "60-wall.md"
+    order = [files.index(f) for f in ("20-guesses.md", "30-almost.md", "02-chooser.md", "04-temperature.md", "06-loops.md", "40-persona.md", "50-backpack.md")]
+    assert order == sorted(order)
+    for f in ("02-chooser.md", "04-temperature.md", "06-loops.md"):
         body = client.get(f"/static/peek/explain/{f}").text
         assert body.startswith("# ")
         assert "piece" in body               # wall vocabulary; plainText swaps it to "token" under CTXDEMO_VOCAB=plain
+
+
+def test_this_wall_card_is_venue_neutral_and_filled_from_health(client, monkeypatch):
+    # the same card serves Gonzaga (L40, nothing leaves the building) and a rented Linode: model + host come from /api/health
+    assert client.get("/api/health").json()["host"] == "a single GPU"
+    from app.config import load
+    monkeypatch.setenv("CTXDEMO_HOST_BLURB", "one rented GPU in Seattle"); assert load().host_blurb == "one rented GPU in Seattle"
+    body = client.get("/static/peek/explain/60-wall.md").text
+    assert "{{model}}" in body and "{{host}}" in body
+    assert "L40" not in body and "Qwen3-8B" not in body and "nothing leaves" not in body
+    assert "fillVars(" in client.get("/static/peek/explain.js").text and "chipsFor(" in client.get("/static/peek/explain.js").text
+
+
+def test_default_persona_and_context_card_are_venue_neutral(client):
+    # laptops have no camera and no whiteboard; the wall has no tabs any more
+    p = {x["id"]: x for x in client.get("/api/personas").json()["personas"]}
+    assert p["wall"]["title"] == "Short answers"
+    assert "camera" not in p["wall"]["prompt"] and "whiteboard" not in p["wall"]["prompt"]
+    assert "Tab 4" not in client.get("/static/peek/explain/50-backpack.md").text
 
 
 def test_model_leash_caps_the_session_max_tokens(fake, cfg, tmp_path):

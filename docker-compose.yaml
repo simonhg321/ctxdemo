@@ -18,6 +18,7 @@ services:
       - EARS_URL=http://whisper:8300
       - HF_HUB_OFFLINE=1
       - CTXDEMO_TURNLOG=/srv/data/logs/turns.jsonl   # every question + answer, on the data volume; REMOVE this line for an audience that must not be logged
+      - CTXDEMO_HOST_BLURB=the L40 GPU in this lab — nothing leaves the building
       - CTXDEMO_VOCAB=plain                                 # say "tokens" and "context window" on this wall too (Simon, 2026-09-24)
       - CTXDEMO_ADMIN_PASSWORD=${CTXDEMO_ADMIN_PASSWORD:-}   # the model switch (from ./.env, gitignored; empty = switching off)
       - CTXDEMO_COMPOSE_DIR=/srv/compose                     # the vllm compose dir, mounted below: the switch writes its .env

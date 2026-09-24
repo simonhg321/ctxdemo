@@ -50,7 +50,7 @@ peekPanels.tiles = (function () {
     } else {
       t.querySelector('#model-big').textContent = cur.label;
       t.querySelector('#model-sub').textContent = models.error ? 'last switch failed: ' + models.error : (cur.note || '');
-      t.querySelector('#model-hint').textContent = models.enabled ? (pickOpen ? '· pick one above' : '· tap the name to switch') : '';
+      t.querySelector('#model-hint').textContent = models.enabled ? (pickOpen ? '· pick one above' : '· tap the name to switch (needs the password)') : '';
     }
     t.classList.toggle('switching', !!sw);
     const pick = t.querySelector('#model-pick');
@@ -81,17 +81,18 @@ peekPanels.tiles = (function () {
       el.classList.add('row');
       pollGpu(); setInterval(pollGpu, 2000);
       pollModels(); setInterval(pollModels, 3000);
-      el.innerHTML = ['sure', 'worst', 'pack'].map(k => `<div class="tile"><div class="cap" id="${k}-cap"></div><div class="big" id="${k}-big">—</div></div>`).join('');
+      el.innerHTML = ['sure', 'worst', 'pack'].map(k => `<div class="tile"><div class="cap" id="${k}-cap"></div><div class="big" id="${k}-big">—</div>${k === 'worst' ? '<div class="dim" id="worst-sub"></div>' : ''}</div>`).join('');
       const W = peekLib.words();
       el.querySelector('#sure-cap').textContent = W.pieces + ' it was sure about';
       el.querySelector('#worst-cap').textContent = 'biggest hesitation';
-      el.querySelector('#pack-cap').textContent = W.pack + ' full';
+      el.querySelector('#pack-cap').textContent = W.pack + ' used';
       peekBus.on('persona', d => personaTile(d.title));   // driver re-sends this on hello, so a late-joining tiles panel lights up too
     },
     onTurn(msg) {
       const t = msg && msg.turn, st = msg && msg.state, s = peekLib.stats(t && t.tokens);
-      el.querySelector('#sure-big').textContent = t && t.tokens && t.tokens.length ? s.sure_pct + '%' : '—';
+      el.querySelector('#sure-big').innerHTML = t && t.tokens && t.tokens.length ? `${s.sure_pct}% <span class="dim" style="font-size:.55em">${s.sure_n} of ${s.n}</span>` : '—';
       el.querySelector('#worst-big').textContent = s.worst ? `${vis(s.worst.chosen)} vs ${vis(s.worst.runner)}` : '—';
+      el.querySelector('#worst-sub').textContent = s.worst && s.worst.runner_p != null ? `${peekLib.pct(s.worst.p)} vs ${peekLib.pct(s.worst.runner_p)}` : '';   // the odds: the whole lesson in one line
       el.querySelector('#pack-big').textContent = st && st.window_tokens ? Math.round(100 * st.next_would_send / st.window_tokens) + '%' : '—';
     },
   };
