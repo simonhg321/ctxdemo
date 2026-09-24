@@ -519,3 +519,11 @@ def test_deepseek_has_a_short_leash_in_the_allow_list():
     from app.models import load_models
     ds = next(m for m in load_models() if "DeepSeek" in m["id"])
     assert ds["max_tokens"] == 2000
+
+
+def test_layers_layout_scales_the_short_right_column_panels(client):
+    # ?with=layers squeezes "what it almost said" and the layers panel into short boxes; their type scales from the
+    # iframe's own size, so the layout hands them a bigger unit via panel.html?scale=
+    src = client.get("/static/peek/wall.html").text
+    assert "almost: [64, 30, 34, 20, 1.35]" in src and "layers: [64, 51, 34, 27, 1.3]" in src
+    assert "&scale=" in src
