@@ -1,5 +1,5 @@
-import random
 """ctxdemo — 'The Backpack'. FastAPI routes + static page."""
+import random
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.responses import FileResponse
