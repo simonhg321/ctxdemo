@@ -489,3 +489,13 @@ def test_layers_panel_chip_and_wall_slot_are_served(client):
     assert "&quot;" in js
     assert "cache[" in js or "cache =" in js
     assert "wall_token" in js
+
+
+def test_chooser_chips_lead_the_explain_bar(client):
+    # act 6 teaching chips for how a token gets picked: they come first so the story starts before "pieces"
+    files = client.get("/static/peek/explain.json").json()
+    assert files[:3] == ["02-chooser.md", "04-temperature.md", "06-loops.md"]
+    for f in files[:3]:
+        body = client.get(f"/static/peek/explain/{f}").text
+        assert body.startswith("# ")
+        assert "piece" in body               # wall vocabulary; plainText swaps it to "token" under CTXDEMO_VOCAB=plain
