@@ -28,6 +28,7 @@ class Config:
     extract_max_tokens: int = 200
     tokenizer_repo: str = ""             # act 6 chunks: HF repo whose tokenizer matches the chat model; empty = strip hidden
     turnlog: str = ""                    # path of a JSONL file that gets every question + answer; empty = log nothing (default)
+    turnlog_keep: int = 0                # seconds a logged turn (file + the room feed) is kept; 0 = forever. NFCU: 300 (CTXDEMO_TURNLOG_KEEP)
     vocab: str = "wall"                  # words on the wall: "wall" = pieces/backpack, "plain" = tokens/context window (CTXDEMO_VOCAB)
     audience: bool = False               # NFCU Linode: clamp sessions without an X-Presenter header (4k window, 600-token leash, no tools)
     freetext: str = "on"                # the typed-question box: "on" | "password" (the model-switch password unlocks it) | "off" (prepared questions only) — CTXDEMO_FREETEXT
@@ -53,6 +54,7 @@ def load(root: Path = ROOT) -> Config:
         demo["tokenizer_repo"] = os.environ["CTXDEMO_TOKENIZER"]
     if os.environ.get("CTXDEMO_TURNLOG"):
         demo["turnlog"] = os.environ["CTXDEMO_TURNLOG"]
+    demo["turnlog_keep"] = max(0, int(os.environ.get("CTXDEMO_TURNLOG_KEEP") or 0))
     demo["audience"] = os.environ.get("CTXDEMO_AUDIENCE") == "1"
     demo["vocab"] = "plain" if os.environ.get("CTXDEMO_VOCAB") == "plain" else "wall"
     demo["room"] = os.environ.get("CTXDEMO_ROOM") == "1"

@@ -75,3 +75,45 @@ def test_turn_log_keeps_every_piece_and_the_system_prompt(fake, cfg, tmp_path):
     assert [p["t"] for p in rec["pieces"]] == ["Hello", "there"] and rec["pieces"][0]["alts"]
     assert "university lab" in rec["system"] and rec["window_tokens"] == 1600 and rec["max_tokens"] == cfg.answer_max_tokens
     assert rec["cut"] is False and rec["tool_uses"] == [] and rec["model"] == "fake"
+
+
+def test_retention_prunes_old_lines_in_place_and_keeps_fresh_ones(tmp_path):
+    import time
+    path = tmp_path / "turns.jsonl"
+    tl = TurnLog(path, keep=300)
+    old = time.strftime(TurnLog.TS, time.localtime(time.time() - 600))
+    path.write_text(json.dumps({"ts": old, "user": "old"}) + "\n" + "not json\n")
+    ino = path.stat().st_ino
+    tl.write("s", "board", "fresh", "hi", 0.1)
+    recs = [json.loads(l) for l in path.read_text().splitlines()]
+    assert [r["user"] for r in recs] == ["fresh"]                 # the old line and the junk line are gone, on the first write
+    assert path.stat().st_ino == ino                               # rewritten in place: the container's appender never loses the file
+    assert tl.prune(now=time.time() + 301) == 1 and path.read_text() == ""   # and the pruner empties it after the window
+
+
+def test_no_retention_by_default_and_gonzaga_keeps_forever(tmp_path):
+    path = tmp_path / "turns.jsonl"
+    tl = TurnLog(path)
+    tl.write("s", "board", "a", "b", 0.1); tl.write("s", "board", "c", "d", 0.1)
+    assert tl.keep == 0 and tl.prune() == 0 and len(path.read_text().splitlines()) == 2
+    tl.start_pruner(); assert tl._pruner is None                   # nothing to run
+
+
+def test_room_feed_and_health_follow_the_retention_window(fake, cfg, tmp_path, monkeypatch):
+    import time
+    from app import main as m
+    path = tmp_path / "turns.jsonl"
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, turnlog=str(path), turnlog_keep=300)))
+    assert c.get("/api/health").json()["turnlog_keep"] == 300
+    sid = c.post("/api/session", json={"mode": "compact", "board": True, "peek": True}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "remember me"})
+    assert [t["user"] for t in c.get("/api/room").json()["turns"]] == ["remember me"] and "at" not in c.get("/api/room").json()["turns"][0]
+    real = time.time; monkeypatch.setattr(m.time, "time", lambda: real() + 301)
+    assert c.get("/api/room").json()["turns"] == []               # five minutes later the room has forgotten it too
+
+
+def test_retention_env_reaches_config(monkeypatch):
+    from app.config import load
+    assert load().turnlog_keep == 0
+    monkeypatch.setenv("CTXDEMO_TURNLOG_KEEP", "300"); assert load().turnlog_keep == 300
+    monkeypatch.setenv("CTXDEMO_TURNLOG_KEEP", "-5"); assert load().turnlog_keep == 0

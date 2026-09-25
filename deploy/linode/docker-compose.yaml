@@ -44,6 +44,7 @@ services:
       - VLLM_URL=http://vllm:8000
       - HF_HUB_OFFLINE=1
       - CTXDEMO_TURNLOG=/srv/data/logs/turns.jsonl    # on for the talk (said on the slide; first names optional)
+      - CTXDEMO_TURNLOG_KEEP=300                       # …and held 5 minutes only: the file and the room feed forget older turns (Simon, 2026-09-25, for the NFCU ask)
       - CTXDEMO_FREETEXT=password                       # typed questions + custom personas need the model-switch password (Simon, 2026-09-24); prepared questions for everyone
       - CTXDEMO_ROOM=1                                 # optional first-name box -> the room feed
       - CTXDEMO_HOST_BLURB=one rented GPU in Seattle (questions are logged; first names optional)

@@ -94,8 +94,16 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
             else VLLM(cfg.vision_url or cfg.vllm_url, cfg.vision_model or cfg.model)
     tools = tools or Tools()
     chunker = chunker or Chunker(cfg.tokenizer_repo)
-    turnlog = TurnLog(cfg.turnlog)
-    room: deque = deque(maxlen=60)     # the presenter's live feed: the last turns from every session, newest last
+    turnlog = TurnLog(cfg.turnlog, cfg.turnlog_keep); turnlog.start_pruner()
+    room: deque = deque(maxlen=60)     # the presenter's live feed: the last turns from every session, newest last; same retention as the log
+
+    def room_fresh():
+        """With a retention window, forget room entries older than it (the feed is the other place question text lives)."""
+        if cfg.turnlog_keep:
+            cutoff = time.time() - cfg.turnlog_keep
+            while room and room[0]["at"] < cutoff:
+                room.popleft()
+        return [{k: v for k, v in e.items() if k != "at"} for e in room]
     netdata = httpx.Client(base_url=cfg.netdata_url.rstrip("/"), timeout=3, transport=netdata_transport) if cfg.netdata_url else None
     layers = httpx.Client(base_url=cfg.layers_url.rstrip("/"), timeout=60, transport=layers_transport) if cfg.layers_url else None
 
@@ -148,7 +156,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     @app.get("/api/health")
     def health(request: Request):
         return {"vllm": "ok" if vllm.health() else "down", "model": current_model(), "window_tokens": cfg.window_tokens,
-                "audience": is_audience(request), "room": cfg.room, "host": cfg.host_blurb, "infographic": cfg.infographic, "freetext": cfg.freetext, "switching": switcher.switching, "vocab": cfg.vocab,
+                "audience": is_audience(request), "room": cfg.room, "host": cfg.host_blurb, "infographic": cfg.infographic, "turnlog_keep": cfg.turnlog_keep if cfg.turnlog else None, "freetext": cfg.freetext, "switching": switcher.switching, "vocab": cfg.vocab,
                 "tools_ok": (switcher.info(current_model()) or {"tools": True})["tools"],
                 "vision": "ok" if vision.health() else "down", "vision_model": getattr(vision, "model", cfg.model),
                 "exact_counts": getattr(vllm, "exact", True), "board_window": cfg.board_window,
@@ -213,7 +221,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         """The room: recent questions from every session, newest first. Presenter-only when the audience clamp is on."""
         if is_audience(request):
             raise HTTPException(403, "presenter only")
-        return {"turns": list(reversed(room))}
+        return {"turns": list(reversed(room_fresh()))}
 
     @app.post("/api/layers")
     def api_layers(req: LayersReq = Body(...)):
@@ -306,7 +314,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         name = (req.name or "").strip()[:24] or getattr(s, "room_name", None)   # a name given once sticks to the session
         s.room_name = name
         if tr.answer is not None:
-            room.append({"ts": time.strftime("%H:%M:%S"), "name": name, "user": text, "answer": (tr.answer or "")[:160],
+            room.append({"ts": time.strftime("%H:%M:%S"), "at": time.time(), "name": name, "user": text, "answer": (tr.answer or "")[:160],
                          "seconds": tr.seconds, "persona": s.persona, "session": s.id[:6],
                          **{k: v for k, v in hesitations(tr.tokens).items() if k in ("pieces", "flips")},
                          "sure_pct": (round(100 * sum(1 for t in tr.tokens if t.get("t", "").strip() and t.get("p", 1) >= 0.9)
