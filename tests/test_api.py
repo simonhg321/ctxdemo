@@ -509,7 +509,7 @@ def test_this_wall_card_is_venue_neutral_and_filled_from_health(client, monkeypa
     from app.config import load
     monkeypatch.setenv("CTXDEMO_HOST_BLURB", "one rented GPU in Seattle"); assert load().host_blurb == "one rented GPU in Seattle"
     body = client.get("/static/peek/explain/60-wall.md").text
-    assert "{{model}}" in body and "{{host}}" in body
+    assert "{{model}}" in body and "{{host}}" in body and "{{infographic}}" in body
     assert "L40" not in body and "Qwen3-8B" not in body and "nothing leaves" not in body
     assert "fillVars(" in client.get("/static/peek/explain.js").text and "chipsFor(" in client.get("/static/peek/explain.js").text
 
@@ -588,3 +588,12 @@ def test_freetext_mode_reaches_health_and_unlock_is_read_only(fake, cfg, tmp_pat
         assert "freetext" in c.get(f"/static/peek/{f}").text, f                                        # both free-text boxes obey the mode
     assert "sampling" in c.get("/static/peek/explain.js").text and "sampling" in c.get("/static/peek/driver.js").text
     assert "dials" in c.get("/static/peek/explain/04-temperature.md").text.lower()
+
+
+def test_this_wall_card_links_the_printable_explainer_per_venue(client, monkeypatch):
+    # one card, two editions of the one-pager: Gonzaga's by default, the NFCU one where the Linode compose says so
+    assert client.get("/api/health").json()["infographic"] == "see-it-think.pdf"
+    from app.config import load
+    monkeypatch.setenv("CTXDEMO_INFOGRAPHIC", "see-it-think-nfcu.pdf"); assert load().infographic == "see-it-think-nfcu.pdf"
+    for f in ("see-it-think.pdf", "see-it-think-nfcu.pdf"):          # both ship in the image; the link is relative to wall.html
+        r = client.get(f"/static/peek/{f}"); assert r.status_code == 200 and r.content[:5] == b"%PDF-", f

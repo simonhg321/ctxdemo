@@ -47,6 +47,7 @@ services:
       - CTXDEMO_FREETEXT=password                       # typed questions + custom personas need the model-switch password (Simon, 2026-09-24); prepared questions for everyone
       - CTXDEMO_ROOM=1                                 # optional first-name box -> the room feed
       - CTXDEMO_HOST_BLURB=one rented GPU in Seattle (questions are logged; first names optional)
+      - CTXDEMO_INFOGRAPHIC=see-it-think-nfcu.pdf   # the "this wall" card links the NFCU edition of the one-pager (rented GPU, no layers sidecar)
       - CTXDEMO_VOCAB=plain                            # say "tokens" and "context window" on this wall (Gonzaga keeps pieces/backpack)
       - NETDATA_URL=http://host.docker.internal:19999  # GPU busy % tile (Netdata on the host)
       - CTXDEMO_ADMIN_PASSWORD=${CTXDEMO_ADMIN_PASSWORD:-}   # the model switch (from .env; empty = switching off)

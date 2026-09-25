@@ -192,3 +192,14 @@ test('freetextAllows: on / off / password-until-unlocked', () => {
   assert.equal(L.freetextAllows('password', true), true);
   assert.equal(L.freetextAllows(undefined, false), true);   // an old server without the field: as before
 });
+
+test('explainInline: markdown links, relative or https only, new tab', () => {
+  assert.equal(L.explainInline('read [the PDF](see-it-think.pdf) now'), 'read <a href="see-it-think.pdf" target="_blank" rel="noopener">the PDF</a> now');
+  assert.equal(L.explainInline('[x](https://iiat.gonzaga.edu/demo/)'), '<a href="https://iiat.gonzaga.edu/demo/" target="_blank" rel="noopener">x</a>');
+  assert.equal(L.explainInline('[x](javascript:alert(1))'), '[x](javascript:alert(1))');   // not a link
+  assert.equal(L.explainInline('[x]("onclick=1)'), '[x](&quot;onclick=1)'.replace('&quot;', '"'));   // quotes never reach an href
+});
+test('fillVars: {{infographic}} is the PDF file name from health', () => {
+  assert.equal(L.fillVars('**[PDF]({{infographic}})**', { infographic: 'see-it-think-nfcu.pdf' }), '**[PDF](see-it-think-nfcu.pdf)**');
+  assert.equal(L.fillVars('[PDF]({{infographic}})', {}), '[PDF](…)');
+});

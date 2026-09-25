@@ -32,6 +32,7 @@ class Config:
     audience: bool = False               # NFCU Linode: clamp sessions without an X-Presenter header (4k window, 600-token leash, no tools)
     freetext: str = "on"                # the typed-question box: "on" | "password" (the model-switch password unlocks it) | "off" (prepared questions only) — CTXDEMO_FREETEXT
     host_blurb: str = "a single GPU"    # the "this wall" card: where the model runs (CTXDEMO_HOST_BLURB), per venue
+    infographic: str = "see-it-think.pdf"   # the "this wall" card links the printable one-pager under static/peek/ (CTXDEMO_INFOGRAPHIC), per venue
     room: bool = False                   # NFCU: show the optional first-name box (feeds the presenter's room panel)
     netdata_url: str = ""                # NFCU: Netdata agent for /api/gpu (GPU busy % in the tiles); empty = no tile
     layers_url: str = ""                 # piece 4: the "inside the head" sidecar (LAYERS_URL); empty = the layers panel says it is off
@@ -57,6 +58,7 @@ def load(root: Path = ROOT) -> Config:
     demo["room"] = os.environ.get("CTXDEMO_ROOM") == "1"
     demo["freetext"] = os.environ.get("CTXDEMO_FREETEXT") if os.environ.get("CTXDEMO_FREETEXT") in ("on", "password", "off") else "on"
     demo["host_blurb"] = os.environ.get("CTXDEMO_HOST_BLURB") or "a single GPU"
+    demo["infographic"] = os.environ.get("CTXDEMO_INFOGRAPHIC") or "see-it-think.pdf"
     demo["netdata_url"] = os.environ.get("NETDATA_URL", "")
     demo["layers_url"] = os.environ.get("LAYERS_URL", "")
     demo["admin_password"] = os.environ.get("CTXDEMO_ADMIN_PASSWORD", "")

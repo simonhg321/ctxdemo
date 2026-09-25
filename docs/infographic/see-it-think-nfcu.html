@@ -71,21 +71,21 @@
     <h1>See it <span>think.</span></h1>
     <p>A language model is a machine that guesses the next word, one token at a time. This wall shows every guess it made, how sure it was, and what it almost said instead.</p>
   </div>
-  <div class="brand">IIAT HACLab<small>Gonzaga University · September 2026</small></div>
+  <div class="brand">NFCU · ACI all-hands<small>from the IIAT HACLab, Gonzaga University · September 2026</small></div>
 </header>
 
 <main>
   <section class="card wide">
     <div class="n">1</div><h2>The box in the room</h2>
-    <p class="lead">Everything on the wall runs here, in the lab, on one graphics card. Nothing leaves the building.</p>
+    <p class="lead">Everything on this wall runs on one rented graphics card in Seattle. Questions are logged; first names are optional.</p>
     <div class="stats">
-      <div class="stat"><b>NVIDIA L40</b><small>one GPU · 46 GB memory</small></div>
+      <div class="stat"><b>RTX 4000 Ada</b><small>one GPU · 20 GB memory</small></div>
       <div class="stat"><b>Qwen3 8B</b><small>the model · 8 billion weights</small></div>
       <div class="stat"><b>36 layers</b><small>each token passes through all of them</small></div>
-      <div class="stat"><b>~30 / s</b><small>tokens generated per second</small></div>
+      <div class="stat"><b>~35 / s</b><small>tokens generated per second, one person at a time</small></div>
     </div>
-    <div class="mem"><i class="a"></i><i class="b2"></i></div>
-    <div class="memk"><span>■ 18 GB the model you talk to</span><span style="color:var(--red)">■ 10 GB its 4B sibling, read layer by layer</span><span>□ 18 GB free</span></div>
+    <div class="mem"><i class="a" style="width:41%"></i><i class="b2" style="width:45%"></i></div>
+    <div class="memk"><span>■ 8 GB the model you talk to</span><span style="color:var(--red)">■ 9 GB working memory for 15 people at once</span><span>□ 3 GB spare</span></div>
   </section>
 
   <section class="card">
@@ -120,7 +120,7 @@
 
   <section class="card wide navy">
     <div class="n">5</div><h2>Inside the head, layer by layer</h2>
-    <p>A smaller sibling of the model (Qwen3 4B, 36 layers) reads the same question while we watch each layer’s best guess for the first word. Early layers babble. Somewhere in the middle, it makes up its mind.</p>
+    <p>On the lab wall at Gonzaga, a smaller sibling of the model (Qwen3 4B, 36 layers) reads the same question while we watch each layer’s best guess for the first word. Early layers babble. Somewhere in the middle, it makes up its mind.</p>
     <div class="layers">
       <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
       <i class="yes" style="height:34%"></i><i class="yes" style="height:40%"></i><i class="yes" style="height:48%"></i><i class="yes" style="height:56%"></i><i class="yes" style="height:66%"></i><i class="yes" style="height:78%"></i><i class="yes" style="height:76%"></i><i class="yes" style="height:74%"></i><i class="yes" style="height:72%"></i><i class="yes" style="height:70%"></i>
@@ -145,7 +145,7 @@
 </main>
 
 <footer>
-  <div><span class="url">iiat.gonzaga.edu/demo</span> · every number on this page came back from the model with its answer; the wall only draws them.</div>
-  <div>Built in the IIAT HACLab on IIAT-HACLAB-01 · vLLM · TransformerLens · one L40</div>
+  <div><span class="url">demo.instockornot.club</span> · every number on this page came back from the model with its answer; the wall only draws them.</div>
+  <div>Built in the IIAT HACLab at Gonzaga University · vLLM · one rented RTX 4000 Ada</div>
 </footer>
 </div></body></html>

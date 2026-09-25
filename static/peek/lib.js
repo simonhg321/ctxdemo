@@ -41,13 +41,15 @@
     flushPara(); flushUl();
     return { label, blocks };
   }
-  // **bold** and `code`, everything else HTML-escaped — the card renders our files, but persona titles/prompts from
+  // **bold**, `code` and [links](relative-or-https), everything else HTML-escaped — the card renders our files, but persona titles/prompts from
   // the API pass through here too, so escaping has to hold even when the text isn't ours.
   function explainInline(text) {
     const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     return esc(String(text || ''))
       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
-      .replace(/`(.+?)`/g, '<code>$1</code>');
+      .replace(/`(.+?)`/g, '<code>$1</code>')
+      // [text](url): relative paths or http(s) only — never javascript:, never quotes — opens in a new tab so the wall stays put
+      .replace(/\[([^\]]+)\]\(((?:https?:\/\/)?[\w./%-]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
   }
   // act 6, wire panel: the body the driver would post for this persona + question — the same shape app/vllm.py builds
   // (peek session, persona leash 10,000). Shown before the first turn so the room can see the two flags without waiting.
@@ -116,10 +118,10 @@
       .replace(/\bPieces\b/g, 'Tokens').replace(/\bpieces\b/g, 'tokens').replace(/\bPiece\b/g, 'Token').replace(/\bpiece\b/g, 'token')
       .replace(/\bBackpack\b/g, 'Context window').replace(/\bbackpack\b/g, 'context window');
   }
-  // the "this wall" card: {{model}} / {{host}} filled from /api/health so one card serves every venue (short model name; … when unknown)
+  // the "this wall" card: {{model}} / {{host}} / {{infographic}} (the printable PDF's file name) filled from /api/health so one card serves every venue (short model name; … when unknown)
   function fillVars(text, vars) {
     const v = vars || {};
-    return String(text || '').replace(/\{\{(model|host)\}\}/g, (m, k) => {
+    return String(text || '').replace(/\{\{(model|host|infographic)\}\}/g, (m, k) => {
       const val = v[k]; if (!val) return '…';
       return k === 'model' ? String(val).split('/').pop() : String(val);
     });
