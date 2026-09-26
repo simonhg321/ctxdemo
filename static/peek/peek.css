@@ -50,6 +50,12 @@ input[type=text] { width: 100%; }
 #panel.wire .wire-cols > div { display: flex; flex-direction: column; min-height: 0; gap: .3em; }
 #panel.wire pre { margin: 0; flex: 1; min-height: 0; overflow: auto; font: .85em/1.4 ui-monospace, Menlo, Consolas, monospace; background: var(--panel); border: 1px solid var(--line); border-radius: .3em; padding: .8em; white-space: pre; }
 #panel.wire #note { font-size: .75em; }
+/* the request/reply boxes scroll, but macOS overlay scrollbars hide until you drag — keep a visible bar on the right so the wall shows there is more */
+#panel.wire pre { scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: var(--dim) var(--ground); }
+#panel.wire pre::-webkit-scrollbar { width: .55em; height: .55em; }
+#panel.wire pre::-webkit-scrollbar-track { background: var(--ground); border-radius: .3em; }
+#panel.wire pre::-webkit-scrollbar-thumb { background: var(--dim); border-radius: .3em; border: 2px solid var(--ground); }
+#panel.wire pre::-webkit-scrollbar-thumb:hover { background: var(--ice); }
 mark { background: rgba(242,169,59,.35); color: var(--bone); border-radius: .2em; padding: 0 .15em; }
 
 /* Act 6 explain bar (static/peek/explain.js, wall.html only) — reuses the tokens above, never restyles a panel. */
