@@ -1,6 +1,6 @@
 # demo.instockornot.club — Let's Encrypt automatic. One shared password (on the slide). Full options for everyone.
 #   /            the demo (wall.html)        /gpu/        the GPU dials (slider page)
-#   /monitor/    Netdata on the host          /presenter/  same demo; Caddy adds X-Presenter (only matters if CTXDEMO_AUDIENCE=1 returns)
+#   /monitor/    Netdata on the host          (the /presenter/ door was retired 2026-09-26 — one login, full options for everyone)
 demo.instockornot.club {
 	encode zstd gzip
 	log {
@@ -19,12 +19,6 @@ demo.instockornot.club {
 	handle_path /gpu/* {
 		root * /etc/caddy/conf/site/gpu
 		file_server
-	}
-	handle_path /presenter/* {
-		redir / /presenter/static/peek/wall.html 302
-		reverse_proxy ctxdemo:8200 {
-			header_up X-Presenter 1
-		}
 	}
 	handle {
 		redir / /static/peek/wall.html 302
