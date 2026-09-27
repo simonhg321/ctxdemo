@@ -140,6 +140,7 @@
     peekBus.on('clear', () => personaSuffix(null));
     peekBus.on('hello', () => { const c = peekLib.cleanSampling(sampling); if (c) peekBus.send('sampling', c); });   // a late driver learns the dials
     peekBus.on('wire', d => { if (d && d.open) pulse('wire'); });
+    peekBus.on('explain', d => { if (d && d.id && cardsData.some(c => c.id === d.id)) open(d.id); });   // a panel asks for a card (the model tile → 'models')
     peekBus.on('layers', () => pulse('layers'));
     peekBus.on('model', d => { if (d && !d.switching) fetch('../../api/health').then(r => r.json()).then(h => { health = h; }).catch(() => {}); });   // the card names the running model
     peekBus.send('hello', {});   // late joiner: ask the driver to repeat the current persona (if any)

@@ -58,7 +58,9 @@ peekPanels.tiles = (function () {
     if (pickOpen && !pick.innerHTML) {
       pick.innerHTML = '<select id="model-sel">' + models.models.map(m =>
         `<option value="${esc(m.id)}"${m.current ? ' selected' : ''}>${esc(m.label)} — ${esc(m.note)}${m.cached ? '' : ' (not downloaded: slow)'}</option>`).join('') +
-        '</select><input type="password" id="model-pw" placeholder="password" autocomplete="off"><button type="button" id="model-go">Switch</button><span id="model-msg" class="dim"></span>';
+        '</select><input type="password" id="model-pw" placeholder="password" autocomplete="off"><button type="button" id="model-go">Switch</button><span id="model-msg" class="dim"></span>' +
+        '<div class="dim"><a href="#" id="model-about">what are these models? →</a></div>';
+      pick.querySelector('#model-about').onclick = e => { e.preventDefault(); peekBus.send('explain', { id: 'models' }); };   // opens the "the models" card on the wall
       pick.querySelector('#model-go').onclick = async () => {
         const id = pick.querySelector('#model-sel').value, pw = pick.querySelector('#model-pw').value;
         const r = await fetch('../../api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, password: pw }) });
