@@ -2,7 +2,8 @@
 import random
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Body, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from urllib.parse import quote
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from . import config, script as script_mod
@@ -14,6 +15,7 @@ from .tools import Tools
 from .chunks import Chunker
 from .turnlog import TurnLog, hesitations
 from .models import Switcher, load_models, host_restarts
+from .gate import Gate, COOKIE as GATE_COOKIE, MAX_AGE as GATE_MAX_AGE
 from collections import deque
 from .ears import Ears, split_wake, spoken_command
 from . import grader
@@ -146,6 +148,38 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     @app.get("/")
     def index():
         return FileResponse(ROOT / "static" / "index.html")
+
+    # The gate (Linode): Caddy's forward_auth asks /api/gate/check before every request; see app/gate.py.
+    gate = Gate(cfg.gate_file)
+    app.state.gate = gate
+
+    def caller(request: Request) -> str:
+        return (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "?")).split(",")[0].strip()
+
+    @app.get("/gate")
+    def gate_page():
+        return FileResponse(ROOT / "static" / "gate.html", headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/gate/check")
+    def gate_check(request: Request):
+        if gate.allows(request.cookies.get(GATE_COOKIE)):
+            return Response(status_code=204)
+        uri = request.headers.get("x-forwarded-uri") or "/"
+        if request.headers.get("x-forwarded-method", "GET") == "GET" and "text/html" in request.headers.get("accept", ""):
+            return RedirectResponse("/gate?next=" + quote(uri, safe=""), status_code=302)   # a person: show the box
+        raise HTTPException(401, "the gate is closed: open /gate and enter the key")          # a fetch: say so
+
+    @app.post("/api/gate")
+    def gate_open(request: Request, body: dict = Body(...)):
+        who = caller(request)
+        if gate.throttled(who):
+            raise HTTPException(429, "too many tries; wait a minute")
+        value = gate.try_key(str(body.get("key", "")), who)
+        if not value:
+            raise HTTPException(403, "that key does not open the gate")
+        r = JSONResponse({"ok": True})
+        r.set_cookie(GATE_COOKIE, value, max_age=GATE_MAX_AGE, httponly=True, secure=request.headers.get("x-forwarded-proto", "https") == "https", samesite="lax", path="/")
+        return r
 
     AUDIENCE_WINDOW, AUDIENCE_MAX_TOKENS = 4096, 600
 

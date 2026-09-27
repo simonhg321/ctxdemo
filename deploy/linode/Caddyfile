@@ -1,4 +1,4 @@
-# demo.instockornot.club — Let's Encrypt automatic. One shared password (on the slide). Full options for everyone.
+# demo.instockornot.club — Let's Encrypt automatic. One gate key (on the slide). Full options for everyone.
 #   /            the demo (wall.html)        /gpu/        the GPU dials (slider page)
 #   /monitor/    Netdata on the host          (the /presenter/ door was retired 2026-09-26 — one login, full options for everyone)
 demo.instockornot.club {
@@ -9,8 +9,12 @@ demo.instockornot.club {
 			roll_keep 3
 		}
 	}
-	basic_auth {
-		import /etc/caddy/auth/htpasswd
+	# The gate: one key, no usernames (app/gate.py). Everything except the gate page itself asks ctxdemo first;
+	# a page without the cookie is sent to /gate, a fetch gets 401. The key is the one line in /srv/data/gate/key on the host.
+	# (Back to the password popup: put `basic_auth { import /etc/caddy/auth/htpasswd }` here instead; the htpasswd file is still on the box.)
+	@gated not path /gate /api/gate
+	forward_auth @gated ctxdemo:8200 {
+		uri /api/gate/check
 	}
 	handle_path /monitor/* {
 		reverse_proxy host.docker.internal:19999

@@ -38,6 +38,7 @@ class Config:
     netdata_url: str = ""                # NFCU: Netdata agent for /api/gpu (GPU busy % in the tiles); empty = no tile
     layers_url: str = ""                 # piece 4: the "inside the head" sidecar (LAYERS_URL); empty = the layers panel says it is off
     admin_password: str = ""             # NFCU: password for the model switch; empty = switching disabled
+    gate_file: str = ""                  # NFCU: one-line file holding the gate key (CTXDEMO_GATE_FILE); empty/missing = no gate
     compose_dir: str = ""                # NFCU: where docker-compose.yaml + .env live (mounted into the container); empty = disabled
     hf_hub_dir: str = ""                 # NFCU: the vLLM model cache (…/hub) to flag which models are already downloaded
     prices: dict[str, dict[str, float]] = field(default_factory=dict)
@@ -64,6 +65,7 @@ def load(root: Path = ROOT) -> Config:
     demo["netdata_url"] = os.environ.get("NETDATA_URL", "")
     demo["layers_url"] = os.environ.get("LAYERS_URL", "")
     demo["admin_password"] = os.environ.get("CTXDEMO_ADMIN_PASSWORD", "")
+    demo["gate_file"] = os.environ.get("CTXDEMO_GATE_FILE", "")
     demo["compose_dir"] = os.environ.get("CTXDEMO_COMPOSE_DIR", "")
     demo["hf_hub_dir"] = os.environ.get("CTXDEMO_HF_HUB", "")
     url = os.environ.get("VLLM_URL", "http://127.0.0.1:8100")

@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>See it think</title><meta name="robots" content="noindex">
+<style>
+  :root { --ground: #0f1216; --panel: #171c22; --line: #262d36; --bone: #e6e1d6; --dim: #6b7480; --amber: #f2a93b; --ice: #7fc8e8; --red: #e0553c; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--ground); color: var(--bone); font: 18px/1.45 "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 16px; }
+  main { width: 100%; max-width: 30em; text-align: center; }
+  h1 { font-size: 2em; margin: 0 0 .2em; letter-spacing: -.01em; }
+  h1 span { color: var(--amber); }
+  p { color: var(--dim); margin: 0 0 1.6em; }
+  form { display: flex; gap: .5em; justify-content: center; flex-wrap: wrap; }
+  input { font: 1.1em ui-monospace, Menlo, Consolas, monospace; color: var(--bone); background: var(--panel); border: 1px solid var(--line);
+    border-radius: .4em; padding: .6em .9em; width: 13em; max-width: 100%; text-transform: uppercase; text-align: center; outline: none; }
+  input:focus { border-color: var(--ice); }
+  input::placeholder { color: var(--dim); text-transform: none; }
+  button { font: inherit; font-weight: 700; color: var(--ground); background: var(--amber); border: 0; border-radius: .4em; padding: .6em 1.3em; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  #msg { min-height: 1.5em; margin-top: 1em; color: var(--red); font-size: .9em; }
+  footer { margin-top: 3em; color: var(--dim); font-size: .75em; }
+</style></head>
+<body><main>
+  <h1>See it <span>think</span></h1>
+  <p>Watch a language model choose its words, one token at a time.<br>Enter the key to come in.</p>
+  <form id="f" autocomplete="off">
+    <input id="key" name="key" type="text" placeholder="the key" autofocus autocapitalize="characters" autocorrect="off" spellcheck="false" aria-label="the key">
+    <button id="go" type="submit">Enter</button>
+  </form>
+  <div id="msg" role="alert"></div>
+  <footer>Ask whoever sent you here for the key.</footer>
+</main>
+<script>
+  // One key, checked on the server (POST /api/gate); a right key sets a cookie and sends you where you were going.
+  const q = new URLSearchParams(location.search), f = document.getElementById('f'), key = document.getElementById('key'),
+        go = document.getElementById('go'), msg = document.getElementById('msg');
+  const next = () => { const n = q.get('next') || '/'; return n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/gate') ? n : '/'; };   // same site only
+  async function open(k) {
+    go.disabled = true; msg.textContent = '';
+    try {
+      const r = await fetch('/api/gate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: k }) });
+      if (r.ok) { location.replace(next()); return; }
+      msg.textContent = r.status === 429 ? 'Too many tries. Wait a minute and try again.' : 'That key does not open the gate.';
+    } catch (e) { msg.textContent = 'Could not reach the server: ' + e.message; }
+    go.disabled = false; key.value = ''; key.focus();
+  }
+  f.addEventListener('submit', e => { e.preventDefault(); if (key.value.trim()) open(key.value); });
+  if (q.get('k')) { history.replaceState(null, '', '/gate' + (q.get('next') ? '?next=' + encodeURIComponent(q.get('next')) : '')); open(q.get('k')); }   // a QR or a bookmark: /gate?k=THE-KEY
+</script></body></html>
