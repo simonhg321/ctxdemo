@@ -17,7 +17,6 @@ from .turnlog import TurnLog, hesitations
 from .models import Switcher, load_models, host_restarts
 from .gate import Gate, COOKIE as GATE_COOKIE, MAX_AGE as GATE_MAX_AGE
 from .presence import Presence, busy_line
-from .timings import Timings
 from collections import deque
 from .ears import Ears, split_wake, spoken_command
 from . import grader
@@ -72,7 +71,6 @@ class TurnReq(BaseModel):
     source: str | None = None    # "typed" (default) or "voice" — only for the turn log
     name: str | None = None      # NFCU: optional first name for the presenter's room feed (and the turn log)
     sampling: dict | None = None  # the temperature card's dials: temperature / top_p / top_k / repetition_penalty (clamped server-side; None = greedy)
-    ask: bool = False            # a prepared question (a tap on an ask button): timed for the traffic lights
 
 
 class UnlockReq(BaseModel):
@@ -105,7 +103,6 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     chunker = chunker or Chunker(cfg.tokenizer_repo)
     turnlog = TurnLog(cfg.turnlog, cfg.turnlog_keep); turnlog.start_pruner()
     presence = Presence()              # open browsers, for the people-here tile and the model switch's "others are here"
-    timings = Timings(cfg.timings)     # seconds per prepared question per model, for the traffic lights
     room: deque = deque(maxlen=60)     # the presenter's live feed: the last turns from every session, newest last; same retention as the log
 
     def room_fresh():
@@ -218,11 +215,6 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     def here(req: HereReq = Body(default=HereReq())):
         """Still here: every open wall says so every 10 s. Returns the head count and the GPU's line in one trip."""
         return {"here": presence.beat(req.id), "queue": vllm.queue() if hasattr(vllm, "queue") else None}
-
-    @app.get("/api/timings")
-    def get_timings():
-        """The traffic lights: how long each prepared question took on the model that is answering now."""
-        return {"model": current_model(), "timings": timings.for_model(current_model())}
 
     @app.get("/api/models")
     def models():
@@ -383,8 +375,6 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
                          "sure_pct": (round(100 * sum(1 for t in tr.tokens if t.get("t", "").strip() and t.get("p", 1) >= 0.9)
                                             / max(1, sum(1 for t in tr.tokens if t.get("t", "").strip()))) if tr.tokens else None),
                          "worst": next(iter(hesitations(tr.tokens)["worst"]), None) if tr.tokens else None})
-        if req.ask and tr.answer is not None and not samp and s.persona == "wall" and not tr.event:   # comparable runs only: plain wall, greedy, no compaction
-            timings.record(current_model(), text, tr.seconds)
         d["asks"] = asks
         d["remembered"] = {a: grader.remembered(tr.answer, scr.details[a]) for a in asks}
         turnlog.write(s.id, tab_of(s), text, tr.answer, tr.seconds, tr.tokens, source=req.source or "typed", persona=s.persona, name=name,

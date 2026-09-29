@@ -53,7 +53,6 @@ services:
       - NETDATA_URL=http://host.docker.internal:19999  # GPU busy % tile (Netdata on the host)
       - CTXDEMO_ADMIN_PASSWORD=${CTXDEMO_ADMIN_PASSWORD:-}   # the model switch (from .env; empty = switching off)
       - CTXDEMO_SWITCH_PASSWORD=${CTXDEMO_SWITCH_PASSWORD:-} # the model switch's own password (from .env); empty = the admin password does both
-      - CTXDEMO_TIMINGS=/srv/data/logs/timings.json          # the traffic lights: seconds per prepared question per model (no question text but the prepared ones)
       - CTXDEMO_COMPOSE_DIR=/srv/compose                     # where .env lives inside the container
       - CTXDEMO_HF_HUB=/srv/data/hf/hub
       - CTXDEMO_GATE_FILE=/srv/data/gate/key                  # the gate key: one line in this file on the host; edit it to change the key (no restart)

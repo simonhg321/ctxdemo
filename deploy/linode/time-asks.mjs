@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// time-asks.mjs — tap every prepared question once, one at a time, on the model that is answering now, so the
-// traffic lights on the ask buttons start from real numbers. The wall does the timing itself (ask: true); this only asks.
+// time-asks.mjs — tap every prepared question once, one at a time, on the model that is answering now, and print how
+// long each took. The colors on the ask buttons are fixed (ASK_LIGHTS in static/peek/lib.js); this is how to re-measure them.
 //   node deploy/linode/time-asks.mjs https://demo.instockornot.club GATE-KEY [rounds]
 // Same session shape the wall's driver opens (default persona, greedy, 4k window). No key = a wall without a gate.
 import { createRequire } from 'node:module';
@@ -33,14 +33,8 @@ for (let round = 1; round <= Number(rounds); round++) {
     const sid = (await (await call('/api/session', session)).json()).session_id;
     const t0 = Date.now();
     try {
-      const t = (await (await call('/api/turn', { session_id: sid, text, ask: true })).json()).turn;
-      console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)} s  ${String((t.tokens || []).length).padStart(5)} tokens${t.cut ? ' (cut)' : ''}  ${text.slice(0, 70)}`);
+      const t = (await (await call('/api/turn', { session_id: sid, text })).json()).turn;
+      console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)} s  ${String((t.tokens || []).length).padStart(5)} tokens${t.cut ? ' (cut)' : ''}  now ${L.askLight(text).padEnd(6)}  ${text.slice(0, 70)}`);
     } catch (e) { console.log(`   FAILED  ${text.slice(0, 60)}  ${e.message}`); }
   }
-}
-const lights = (await (await call('/api/timings')).json()).timings;
-console.log('\nthe lights now:');
-for (const text of asks) {
-  const a = L.askLight(lights, text);
-  console.log(`  ${(a.light || '-').padEnd(7)} ${a.label.padEnd(14)} ${text.slice(0, 70)}`);
 }

@@ -109,14 +109,12 @@
     const k = Math.max(1, n);
     return { big: String(k), cap: k === 1 ? 'person here (you)' : 'people here', sub: queueLine(q) || 'GPU idle' };
   }
-  // the traffic lights on the ask buttons: /api/timings -> a color and "~4 s" for one prepared question on the model answering now.
-  function askLight(timings, text) {
-    const t = timings && timings[text];
-    if (!t || !isFinite(t.seconds)) return { light: null, label: 'not timed yet' };
-    const s = Number(t.seconds);
-    const label = s < 1 ? '<1 s' : s < 10 ? '~' + s.toFixed(1) + ' s' : s < 90 ? '~' + Math.round(s) + ' s' : '~' + Math.round(s / 60) + ' min';   // one decimal under 10 s: 2.6 (green) and 3.1 (yellow) must not both read "3"
-    return { light: ['green', 'yellow', 'red'].includes(t.light) ? t.light : null, label };
-  }
+  // the traffic lights on the ask buttons: one fixed color each, from timing every question on Qwen3 8B and Qwen3 14B with a quiet GPU
+  // (2026-09-29). green = under 5 s on both, yellow = 5 to 10 s, red = longer (US presidents: 43 s on the 8B, 11 s on the 14B).
+  // A question that is not listed is green. Re-measure with deploy/linode/time-asks.mjs and edit this table.
+  const ASK_LIGHTS = { 'Explain how TCP delivers a file, step by step, from SYN to the last ACK': 'yellow',
+    'Every US president in order, with years and one thing each is remembered for': 'red' };
+  const askLight = text => ASK_LIGHTS[text] || 'green';
   // the words on the wall: 'wall' = pieces / backpack (students), 'plain' = tokens / context window (an engineer audience).
   // CTXDEMO_VOCAB on the server -> /api/health.vocab -> panel.html calls setVocab before any panel mounts.
   let vocabMode = 'wall';

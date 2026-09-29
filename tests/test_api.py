@@ -610,27 +610,12 @@ def test_here_counts_open_browsers_and_carries_the_queue(fake, cfg):
     assert "api/here" in t and "peekLib.hereTile(" in t
 
 
-def test_prepared_questions_are_timed_per_model_on_the_plain_wall_only(fake, cfg, tmp_path):
-    from dataclasses import replace
-    f = tmp_path / "timings.json"
-    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, timings=str(f))))
-    assert c.get("/api/timings").json() == {"model": "fake", "timings": {}}
-    sid = c.post("/api/session", json={"mode": "compact", "board": True, "peek": True, "persona": "wall"}).json()["session_id"]
-    c.post("/api/turn", json={"session_id": sid, "text": "Pick a number between 1 and 10", "ask": True})
-    c.post("/api/turn", json={"session_id": sid, "text": "typed by hand"})                                  # not a prepared question
-    c.post("/api/turn", json={"session_id": sid, "text": "A haiku", "ask": True, "sampling": {"temperature": 1}})   # dials moved: not comparable
-    j = c.get("/api/timings").json()
-    assert list(j["timings"]) == ["Pick a number between 1 and 10"]
-    assert j["timings"]["Pick a number between 1 and 10"]["light"] == "green" and j["timings"]["Pick a number between 1 and 10"]["n"] == 1
-    other = c.post("/api/session", json={"mode": "compact", "board": True, "peek": True, "persona": "explain"}).json()["session_id"]
-    c.post("/api/turn", json={"session_id": other, "text": "A haiku", "ask": True})                         # another persona answers longer: not comparable
-    assert list(c.get("/api/timings").json()["timings"]) == ["Pick a number between 1 and 10"]
-    assert "Pick a number" in f.read_text()
-    from app.config import load
-    assert load().timings == ""
-    d = c.get("/static/peek/driver.js").text
-    assert "'timings'" in d and "peekLib.askLight(" in d and "ask: true" in d
-    assert ".light-red" in c.get("/static/peek/peek.css").text
+def test_prepared_questions_wear_fixed_colors_and_nothing_is_timed(client):
+    d = client.get("/static/peek/driver.js").text
+    assert "peekLib.askLight(" in d and "light-" in d and "timings" not in d and "ask: true" not in d
+    assert "ASK_LIGHTS" in client.get("/static/peek/lib.js").text
+    assert ".light-red" in client.get("/static/peek/peek.css").text
+    assert client.get("/api/timings").status_code == 404
 
 
 def test_switch_has_its_own_password_and_asks_before_interrupting(fake, cfg, tmp_path, monkeypatch):

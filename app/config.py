@@ -39,7 +39,6 @@ class Config:
     layers_url: str = ""                 # piece 4: the "inside the head" sidecar (LAYERS_URL); empty = the layers panel says it is off
     admin_password: str = ""             # NFCU: password for the typed-question box, and for the model switch unless switch_password is set
     switch_password: str = ""            # NFCU: a separate password for the model switch (CTXDEMO_SWITCH_PASSWORD); empty = admin_password does both
-    timings: str = ""                    # JSON file that keeps how long each prepared question took per model (CTXDEMO_TIMINGS); empty = memory only
     gate_file: str = ""                  # NFCU: one-line file holding the gate key (CTXDEMO_GATE_FILE); empty/missing = no gate
     compose_dir: str = ""                # NFCU: where docker-compose.yaml + .env live (mounted into the container); empty = disabled
     hf_hub_dir: str = ""                 # NFCU: the vLLM model cache (…/hub) to flag which models are already downloaded
@@ -68,7 +67,6 @@ def load(root: Path = ROOT) -> Config:
     demo["layers_url"] = os.environ.get("LAYERS_URL", "")
     demo["admin_password"] = os.environ.get("CTXDEMO_ADMIN_PASSWORD", "")
     demo["switch_password"] = os.environ.get("CTXDEMO_SWITCH_PASSWORD", "")
-    demo["timings"] = os.environ.get("CTXDEMO_TIMINGS", "")
     demo["gate_file"] = os.environ.get("CTXDEMO_GATE_FILE", "")
     demo["compose_dir"] = os.environ.get("CTXDEMO_COMPOSE_DIR", "")
     demo["hf_hub_dir"] = os.environ.get("CTXDEMO_HF_HUB", "")
