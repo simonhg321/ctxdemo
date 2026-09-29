@@ -23,6 +23,31 @@ peekPanels.tiles = (function () {
     t.querySelector('#gpu-big').textContent = busy + '%';
     t.classList.toggle('hot', busy >= 90);
   }
+  // the people-here tile: this browser says "still here" every 5 s under an id it made up; the answer is the head count + the GPU's line.
+  let hereId = null;
+  function myId() {
+    if (hereId) return hereId;
+    const make = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+    try { hereId = localStorage.getItem('ctxdemo_here'); if (!hereId) { hereId = make(); localStorage.setItem('ctxdemo_here', hereId); } } catch (e) { hereId = make(); }   // private window: an id for this page only
+    return hereId;
+  }
+  function hereTile(n, q) {
+    const m = peekLib.hereTile(n, q); let t = el.querySelector('#here-tile');
+    if (!m) { if (t) t.remove(); return; }
+    if (!t) {
+      t = document.createElement('div'); t.className = 'tile'; t.id = 'here-tile';
+      t.innerHTML = '<div class="cap" id="here-cap"></div><div class="big" id="here-big"></div><div class="dim" id="here-sub" style="font-size:.7em"></div>';
+      el.appendChild(t);
+    }
+    t.querySelector('#here-cap').textContent = m.cap; t.querySelector('#here-big').textContent = m.big; t.querySelector('#here-sub').textContent = m.sub;
+    t.classList.toggle('hot', !!(q && q.waiting));                 // red when someone is waiting in line
+  }
+  async function pollHere() {
+    try {
+      const r = await fetch('../../api/here', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: myId() }) });
+      const j = await r.json(); hereTile(j.here, j.queue);
+    } catch (e) { /* keep the last number */ }
+  }
   async function pollGpu() {
     try { const g = (await (await fetch('../../api/gpu')).json()).gpu; gpuTile(g ? g.busy : null); } catch (e) { /* keep the last number */ }
   }
@@ -61,11 +86,19 @@ peekPanels.tiles = (function () {
         '</select><input type="password" id="model-pw" placeholder="password" autocomplete="off"><button type="button" id="model-go">Switch</button><span id="model-msg" class="dim"></span>' +
         '<div class="dim"><a href="#" id="model-about">what are these models? →</a></div>';
       pick.querySelector('#model-about').onclick = e => { e.preventDefault(); peekBus.send('explain', { id: 'models' }); };   // opens the "the models" card on the wall
-      pick.querySelector('#model-go').onclick = async () => {
+      let sure = false;                                             // others are here and the presenter said "switch anyway"
+      const go = pick.querySelector('#model-go'), msg = pick.querySelector('#model-msg');
+      const calm = text => { sure = false; go.textContent = 'Switch'; msg.textContent = text || ''; };
+      pick.querySelector('#model-sel').onchange = () => calm('');
+      go.onclick = async () => {
         const id = pick.querySelector('#model-sel').value, pw = pick.querySelector('#model-pw').value;
-        const r = await fetch('../../api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, password: pw }) });
-        if (!r.ok) { pick.querySelector('#model-msg').textContent = (await r.json().catch(() => ({}))).detail || r.statusText; return; }
-        pick.querySelector('#model-pw').value = ''; pickOpen = false; pollModels();
+        const r = await fetch('../../api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id, password: pw, here: myId() }, sure ? { confirm: true } : {})) });
+        if (!r.ok) {
+          const d = (await r.json().catch(() => ({}))).detail;
+          if (d && d.busy) { sure = true; go.textContent = 'Switch anyway'; msg.textContent = d.message + '. A switch takes the wall away from everyone for a minute or more.'; return; }
+          calm(typeof d === 'string' ? d : r.statusText); return;
+        }
+        calm(''); pick.querySelector('#model-pw').value = ''; pickOpen = false; pollModels();
       };
     }
   }
@@ -83,6 +116,7 @@ peekPanels.tiles = (function () {
       el.classList.add('row');
       pollGpu(); setInterval(pollGpu, 2000);
       pollModels(); setInterval(pollModels, 3000);
+      setTimeout(pollHere, 0); setInterval(pollHere, 5000);          // after the three number tiles are drawn (innerHTML below would wipe an earlier tile)
       el.innerHTML = ['sure', 'worst', 'pack'].map(k => `<div class="tile"><div class="cap" id="${k}-cap"></div><div class="big" id="${k}-big">—</div>${k === 'worst' ? '<div class="dim" id="worst-sub"></div>' : ''}</div>`).join('');
       const W = peekLib.words();
       el.querySelector('#sure-cap').textContent = W.pieces + ' it was sure about';

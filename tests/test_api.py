@@ -597,3 +597,71 @@ def test_this_wall_card_links_the_printable_explainer_per_venue(client, monkeypa
     monkeypatch.setenv("CTXDEMO_INFOGRAPHIC", "see-it-think-nfcu.pdf"); assert load().infographic == "see-it-think-nfcu.pdf"
     for f in ("see-it-think.pdf", "see-it-think-nfcu.pdf"):          # both ship in the image; the link is relative to wall.html
         r = client.get(f"/static/peek/{f}"); assert r.status_code == 200 and r.content[:5] == b"%PDF-", f
+
+
+def test_here_counts_open_browsers_and_carries_the_queue(fake, cfg):
+    c = TestClient(create_app(vllm=fake, cfg=cfg))
+    assert c.post("/api/here", json={"id": "a"}).json() == {"here": 1, "queue": None}
+    fake.queue = lambda: {"running": 2, "waiting": 1, "kv_pct": 3}
+    assert c.post("/api/here", json={"id": "b"}).json() == {"here": 2, "queue": {"running": 2, "waiting": 1, "kv_pct": 3}}
+    assert c.post("/api/here", json={"id": "a"}).json()["here"] == 2
+    assert c.post("/api/here", json={}).json()["here"] == 2                     # no id: a reader, not a seat
+    t = c.get("/static/peek/tiles.js").text
+    assert "api/here" in t and "peekLib.hereTile(" in t
+
+
+def test_prepared_questions_are_timed_per_model_on_the_plain_wall_only(fake, cfg, tmp_path):
+    from dataclasses import replace
+    f = tmp_path / "timings.json"
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, timings=str(f))))
+    assert c.get("/api/timings").json() == {"model": "fake", "timings": {}}
+    sid = c.post("/api/session", json={"mode": "compact", "board": True, "peek": True, "persona": "wall"}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": sid, "text": "Pick a number between 1 and 10", "ask": True})
+    c.post("/api/turn", json={"session_id": sid, "text": "typed by hand"})                                  # not a prepared question
+    c.post("/api/turn", json={"session_id": sid, "text": "A haiku", "ask": True, "sampling": {"temperature": 1}})   # dials moved: not comparable
+    j = c.get("/api/timings").json()
+    assert list(j["timings"]) == ["Pick a number between 1 and 10"]
+    assert j["timings"]["Pick a number between 1 and 10"]["light"] == "green" and j["timings"]["Pick a number between 1 and 10"]["n"] == 1
+    other = c.post("/api/session", json={"mode": "compact", "board": True, "peek": True, "persona": "explain"}).json()["session_id"]
+    c.post("/api/turn", json={"session_id": other, "text": "A haiku", "ask": True})                         # another persona answers longer: not comparable
+    assert list(c.get("/api/timings").json()["timings"]) == ["Pick a number between 1 and 10"]
+    assert "Pick a number" in f.read_text()
+    from app.config import load
+    assert load().timings == ""
+    d = c.get("/static/peek/driver.js").text
+    assert "'timings'" in d and "peekLib.askLight(" in d and "ask: true" in d
+    assert ".light-red" in c.get("/static/peek/peek.css").text
+
+
+def test_switch_has_its_own_password_and_asks_before_interrupting(fake, cfg, tmp_path, monkeypatch):
+    from dataclasses import replace
+    from app.config import load
+    from app.models import Switcher
+    assert load().switch_password == ""
+    monkeypatch.setenv("CTXDEMO_SWITCH_PASSWORD", "s3"); assert load().switch_password == "s3"
+    calls = []
+    sw = Switcher(models=[{"id": "fake", "label": "Fake", "note": "", "args": "", "tools": True, "tokenizer": "x"},
+                          {"id": "other", "label": "Other", "note": "", "args": "--y", "tools": False, "tokenizer": "y"}],
+                  env_file=tmp_path / ".env", compose_dir=tmp_path, hub_dir=tmp_path, password="switch-pw",
+                  runner=lambda cmd, cwd: calls.append(cmd) or 0, wait_for=lambda mid: True, on_switched=lambda m: None)
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, freetext="password", admin_password="pw", switch_password="switch-pw"), switcher=sw))
+    assert c.post("/api/unlock", json={"password": "pw"}).json() == {"ok": True}           # free text keeps its own password
+    assert c.post("/api/unlock", json={"password": "switch-pw"}).json() == {"ok": True}    # whoever may switch may also type
+    assert c.post("/api/unlock", json={"password": "nope"}).status_code == 403
+    assert c.post("/api/model", json={"id": "other", "password": "pw"}).status_code == 403  # the free-text password does not switch
+    c.post("/api/here", json={"id": "me"}); c.post("/api/here", json={"id": "someone"})
+    assert c.post("/api/model", json={"id": "other", "password": "nope", "here": "me"}).status_code == 403   # the password is checked before anything is said
+    r = c.post("/api/model", json={"id": "other", "password": "switch-pw", "here": "me"})
+    assert r.status_code == 409 and r.json()["detail"] == {"busy": True, "message": "1 other person is here"}
+    assert not calls and sw.switching is None
+    assert c.post("/api/model", json={"id": "zzz", "password": "switch-pw", "here": "me", "confirm": True}).status_code == 400
+    r = c.post("/api/model", json={"id": "other", "password": "switch-pw", "here": "me", "confirm": True})
+    assert r.status_code == 200 and r.json()["switching"]["target"] == "other"
+    sw.join(5)
+    assert calls
+    fake.queue = lambda: {"running": 1, "waiting": 0, "kv_pct": 1}
+    alone = TestClient(create_app(vllm=fake, cfg=replace(cfg, switch_password="switch-pw"), switcher=sw))
+    r = alone.post("/api/model", json={"id": "other", "password": "switch-pw", "here": "me"})
+    assert r.status_code == 409 and r.json()["detail"]["message"] == "1 answer is in progress"
+    t = c.get("/static/peek/tiles.js").text
+    assert "confirm: true" in t and "Switch anyway" in t

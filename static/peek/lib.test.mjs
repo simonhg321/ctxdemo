@@ -203,3 +203,20 @@ test('fillVars: {{infographic}} is the PDF file name from health', () => {
   assert.equal(L.fillVars('**[PDF]({{infographic}})**', { infographic: 'see-it-think-nfcu.pdf' }), '**[PDF](see-it-think-nfcu.pdf)**');
   assert.equal(L.fillVars('[PDF]({{infographic}})', {}), '[PDF](…)');
 });
+test('hereTile: the people-here box, with the GPU line under it', () => {
+  assert.equal(L.hereTile(null, null), null);
+  assert.deepEqual(L.hereTile(1, null), { big: '1', cap: 'person here (you)', sub: 'GPU idle' });
+  assert.deepEqual(L.hereTile(4, { running: 2, waiting: 1 }), { big: '4', cap: 'people here', sub: '2 answering · 1 waiting' });
+  assert.deepEqual(L.hereTile(0, { running: 0, waiting: 0 }), { big: '1', cap: 'person here (you)', sub: 'GPU idle' });   // you are looking at it: never zero
+});
+test('askLight: a prepared question wears the color and the seconds it took on this model', () => {
+  const t = { 'Pick a number': { seconds: 0.4, light: 'green', n: 3 }, 'A haiku': { seconds: 4.4, light: 'yellow', n: 1 },
+              'Every country': { seconds: 71.6, light: 'red', n: 2 }, 'Two minutes': { seconds: 133, light: 'red', n: 1 } };
+  assert.deepEqual(L.askLight(t, 'Pick a number'), { light: 'green', label: '<1 s' });
+  assert.deepEqual(L.askLight(t, 'A haiku'), { light: 'yellow', label: '~4.4 s' });
+  assert.deepEqual(L.askLight(t, 'Every country'), { light: 'red', label: '~72 s' });
+  assert.deepEqual(L.askLight(t, 'Two minutes'), { light: 'red', label: '~2 min' });
+  assert.deepEqual(L.askLight(t, 'never run'), { light: null, label: 'not timed yet' });
+  assert.deepEqual(L.askLight(null, 'Pick a number'), { light: null, label: 'not timed yet' });
+  assert.deepEqual(L.askLight({ x: { seconds: 5, light: 'purple' } }, 'x'), { light: null, label: '~5.0 s' });   // only our three colors reach a class name
+});

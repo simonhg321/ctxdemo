@@ -117,3 +117,10 @@ mark { background: rgba(242,169,59,.35); color: var(--bone); border-radius: .2em
 #sampling-controls .dial-hint { grid-column: 2 / -1; font-size: .8em; margin-top: -.2em; }
 #sampling-controls input[type=range] { width: 100%; accent-color: var(--amber, #d9a441); }
 #sampling-controls .dial-foot { display: flex; gap: 1em; align-items: center; justify-content: space-between; margin-top: .6em; flex-wrap: wrap; }
+/* the traffic lights on the prepared questions: how long each takes on the model answering now (/api/timings) */
+button.ask { border-left: .4em solid var(--line); text-align: left; }
+button.ask .secs { color: var(--dim); font-size: .85em; white-space: nowrap; }
+button.ask.light-green { border-left-color: var(--moss); background: rgba(155,191,106,.10); } button.ask.light-green .secs, .k-green { color: var(--moss); }
+button.ask.light-yellow { border-left-color: var(--amber); background: rgba(242,169,59,.14); } button.ask.light-yellow .secs, .k-yellow { color: var(--amber); }
+button.ask.light-red { border-left-color: var(--red); background: rgba(224,85,60,.20); } button.ask.light-red .secs, .k-red { color: var(--red); }
+.lights-key { flex: 1 0 100%; font-size: .9em; }

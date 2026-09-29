@@ -16,6 +16,8 @@ from .chunks import Chunker
 from .turnlog import TurnLog, hesitations
 from .models import Switcher, load_models, host_restarts
 from .gate import Gate, COOKIE as GATE_COOKIE, MAX_AGE as GATE_MAX_AGE
+from .presence import Presence, busy_line
+from .timings import Timings
 from collections import deque
 from .ears import Ears, split_wake, spoken_command
 from . import grader
@@ -70,10 +72,15 @@ class TurnReq(BaseModel):
     source: str | None = None    # "typed" (default) or "voice" — only for the turn log
     name: str | None = None      # NFCU: optional first name for the presenter's room feed (and the turn log)
     sampling: dict | None = None  # the temperature card's dials: temperature / top_p / top_k / repetition_penalty (clamped server-side; None = greedy)
+    ask: bool = False            # a prepared question (a tap on an ask button): timed for the traffic lights
 
 
 class UnlockReq(BaseModel):
     password: str
+
+
+class HereReq(BaseModel):
+    id: str = ""                 # made up by the browser; says nothing about who
 
 
 class SessReq(BaseModel):
@@ -97,6 +104,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     tools = tools or Tools()
     chunker = chunker or Chunker(cfg.tokenizer_repo)
     turnlog = TurnLog(cfg.turnlog, cfg.turnlog_keep); turnlog.start_pruner()
+    presence = Presence()              # open browsers, for the people-here tile and the model switch's "others are here"
+    timings = Timings(cfg.timings)     # seconds per prepared question per model, for the traffic lights
     room: deque = deque(maxlen=60)     # the presenter's live feed: the last turns from every session, newest last; same retention as the log
 
     def room_fresh():
@@ -118,12 +127,13 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
             return "down"
     if hasattr(vllm, "refresh_model"):
         vllm.refresh_model()                          # the served name may differ from config (the model switch changes it)
-    if switcher is None and cfg.compose_dir and cfg.admin_password:
+    switch_pw = cfg.switch_password or cfg.admin_password
+    if switcher is None and cfg.compose_dir and switch_pw:
         def switched(m):                              # vLLM is back on the new model: use its name and its tokenizer
             if hasattr(vllm, "refresh_model"): vllm.refresh_model()
             if hasattr(chunker, "use"): chunker.use(m.get("tokenizer"))
         switcher = Switcher(load_models(), env_file=Path(cfg.compose_dir) / ".env", compose_dir=Path(cfg.compose_dir),
-                            hub_dir=Path(cfg.hf_hub_dir or "/nonexistent"), password=cfg.admin_password, runner=host_restarts,
+                            hub_dir=Path(cfg.hf_hub_dir or "/nonexistent"), password=switch_pw, runner=host_restarts,
                             wait_for=lambda mid: vllm.wait_for_model(mid) if hasattr(vllm, "wait_for_model") else True, on_switched=switched)
     switcher = switcher or Switcher(models=[], env_file=Path("/nonexistent/.env"), compose_dir=Path("/nonexistent"), hub_dir=Path("/nonexistent"), password="")
     current_model = lambda: getattr(vllm, "model", cfg.model)
@@ -204,6 +214,16 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         """How busy the shared GPU is right now, for the ask box's waiting line."""
         return {"queue": vllm.queue() if hasattr(vllm, "queue") else None}
 
+    @app.post("/api/here")
+    def here(req: HereReq = Body(default=HereReq())):
+        """Still here: every open wall says so every 10 s. Returns the head count and the GPU's line in one trip."""
+        return {"here": presence.beat(req.id), "queue": vllm.queue() if hasattr(vllm, "queue") else None}
+
+    @app.get("/api/timings")
+    def get_timings():
+        """The traffic lights: how long each prepared question took on the model that is answering now."""
+        return {"model": current_model(), "timings": timings.for_model(current_model())}
+
     @app.get("/api/models")
     def models():
         """The switch list: what is running, what can be picked, what is already downloaded, whether a switch is in flight."""
@@ -212,6 +232,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     class ModelReq(BaseModel):
         id: str
         password: str = ""
+        here: str = ""               # the asking browser's own presence id, so "others" leaves it out
+        confirm: bool = False        # "switch anyway": others are here or an answer is running, and the presenter said go
 
     class LayersReq(BaseModel):
         session_id: str
@@ -221,13 +243,20 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     def unlock(req: UnlockReq = Body(...)):
         """CTXDEMO_FREETEXT=password: does this password open the typed-question box? Read-only on purpose: checking a credential must never
         restart the model (last night's incident was a same-model 'switch' used as a password check)."""
-        pw = getattr(switcher, "password", "") or cfg.admin_password
-        if not pw or req.password != pw:
+        ok = {p for p in (cfg.admin_password, getattr(switcher, "password", "")) if p}   # whoever may switch the model may also type
+        if req.password not in ok:
             raise HTTPException(403, "wrong password")
         return {"ok": True}
 
     @app.post("/api/model")
     def set_model(req: ModelReq = Body(...)):
+        if not switcher.enabled or req.password != switcher.password:
+            raise HTTPException(403, "wrong password")            # checked first: the head count is not for strangers
+        if not switcher.info(req.id):
+            raise HTTPException(400, "not in the list")
+        busy = busy_line(presence.count(but=req.here), vllm.queue() if hasattr(vllm, "queue") else None)
+        if busy and not req.confirm:                              # a switch takes the wall away from everyone for a minute or more
+            raise HTTPException(409, {"busy": True, "message": busy})
         try:
             return switcher.switch(req.id, req.password, current=current_model())
         except PermissionError:
@@ -354,6 +383,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
                          "sure_pct": (round(100 * sum(1 for t in tr.tokens if t.get("t", "").strip() and t.get("p", 1) >= 0.9)
                                             / max(1, sum(1 for t in tr.tokens if t.get("t", "").strip()))) if tr.tokens else None),
                          "worst": next(iter(hesitations(tr.tokens)["worst"]), None) if tr.tokens else None})
+        if req.ask and tr.answer is not None and not samp and s.persona == "wall" and not tr.event:   # comparable runs only: plain wall, greedy, no compaction
+            timings.record(current_model(), text, tr.seconds)
         d["asks"] = asks
         d["remembered"] = {a: grader.remembered(tr.answer, scr.details[a]) for a in asks}
         turnlog.write(s.id, tab_of(s), text, tr.answer, tr.seconds, tr.tokens, source=req.source or "typed", persona=s.persona, name=name,

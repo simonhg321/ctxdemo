@@ -103,6 +103,20 @@
   const wallFit = (width, fit) => (fit === 'stack' ? 'stack' : 'frozen');
   // the ask box's waiting line, from /api/queue: '' when idle or unknown.
   const queueLine = q => (!q || (!q.running && !q.waiting) ? '' : `${q.running} answering` + (q.waiting ? ` · ${q.waiting} waiting` : ''));
+  // the people-here tile: open browsers (from /api/here) over the GPU's line. You are looking at it, so never fewer than one.
+  function hereTile(n, q) {
+    if (n == null) return null;
+    const k = Math.max(1, n);
+    return { big: String(k), cap: k === 1 ? 'person here (you)' : 'people here', sub: queueLine(q) || 'GPU idle' };
+  }
+  // the traffic lights on the ask buttons: /api/timings -> a color and "~4 s" for one prepared question on the model answering now.
+  function askLight(timings, text) {
+    const t = timings && timings[text];
+    if (!t || !isFinite(t.seconds)) return { light: null, label: 'not timed yet' };
+    const s = Number(t.seconds);
+    const label = s < 1 ? '<1 s' : s < 10 ? '~' + s.toFixed(1) + ' s' : s < 90 ? '~' + Math.round(s) + ' s' : '~' + Math.round(s / 60) + ' min';   // one decimal under 10 s: 2.6 (green) and 3.1 (yellow) must not both read "3"
+    return { light: ['green', 'yellow', 'red'].includes(t.light) ? t.light : null, label };
+  }
   // the words on the wall: 'wall' = pieces / backpack (students), 'plain' = tokens / context window (an engineer audience).
   // CTXDEMO_VOCAB on the server -> /api/health.vocab -> panel.html calls setVocab before any panel mounts.
   let vocabMode = 'wall';
@@ -151,6 +165,6 @@
   // persona panel: a short box (e.g. ?with=layers gives it 30% of the wall) shows titles only, two columns, so all personas stay reachable.
   // Unmeasured (0) is never dense: a first paint with no size must not flash the dense layout.
   function personaFit(heightPx, count) { return heightPx && heightPx < count * 48 + 110 ? 'dense' : 'full'; }
-  const api = { setVocab, words, plainText, fillVars, chipsFor, cleanSampling, samplingLine, freetextAllows, personaFit, queueLine, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
+  const api = { setVocab, words, plainText, fillVars, chipsFor, cleanSampling, samplingLine, freetextAllows, personaFit, queueLine, hereTile, askLight, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.peekLib = api;
 })(typeof window !== 'undefined' ? window : globalThis);
