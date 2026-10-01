@@ -218,3 +218,10 @@ test('askLight: every prepared question wears one fixed color', () => {
   assert.deepEqual([lights.filter(l => l === 'green').length, lights.filter(l => l === 'yellow').length, lights.filter(l => l === 'red').length], [10, 1, 1]);
   assert.equal(L.askLight('a question nobody timed'), 'green');
 });
+test('fitSize: shrink a line until it fits its box, never below the floor', () => {
+  assert.equal(L.fitSize(1.9, 300, 400), 1.9);          // fits already: untouched
+  assert.equal(L.fitSize(1.9, 600, 400), 1.25);         // needs 2/3 of the size, rounded down to 0.05
+  assert.equal(L.fitSize(1.9, 4000, 400), 0.9);         // a monster token stops at the floor
+  assert.equal(L.fitSize(1.9, 0, 400), 1.9);            // nothing measured yet: untouched
+  assert.equal(L.fitSize(1.9, 600, 0), 1.9);
+});

@@ -115,6 +115,10 @@
   const ASK_LIGHTS = { 'Explain how TCP delivers a file, step by step, from SYN to the last ACK': 'yellow',
     'Every US president in order, with years and one thing each is remembered for': 'red' };
   const askLight = text => ASK_LIGHTS[text] || 'green';
+  // the hesitation tile: "“chosen” vs “runner”" at the tile's big size, shrunk (in em) until it fits the tile, down to a floor.
+  // The row's ellipsis used to cut the runner off ("“configura…"), so the whole lesson vanished whenever the chosen token was long.
+  const fitSize = (em, neededPx, availablePx, floor = 0.9) =>
+    (!neededPx || !availablePx || neededPx <= availablePx) ? em : Math.max(floor, Math.floor(em * availablePx / neededPx * 20) / 20);
   // the words on the wall: 'wall' = pieces / backpack (students), 'plain' = tokens / context window (an engineer audience).
   // CTXDEMO_VOCAB on the server -> /api/health.vocab -> panel.html calls setVocab before any panel mounts.
   let vocabMode = 'wall';
@@ -163,6 +167,6 @@
   // persona panel: a short box (e.g. ?with=layers gives it 30% of the wall) shows titles only, two columns, so all personas stay reachable.
   // Unmeasured (0) is never dense: a first paint with no size must not flash the dense layout.
   function personaFit(heightPx, count) { return heightPx && heightPx < count * 48 + 110 ? 'dense' : 'full'; }
-  const api = { setVocab, words, plainText, fillVars, chipsFor, cleanSampling, samplingLine, freetextAllows, personaFit, queueLine, hereTile, askLight, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
+  const api = { setVocab, words, plainText, fillVars, chipsFor, cleanSampling, samplingLine, freetextAllows, personaFit, queueLine, hereTile, askLight, fitSize, asksFor, wallFit, tone, pct, isBlank, hesitations, stats, revealDelay, personaModel, personaSessionFields, explainParse, explainInline, wireDraft, wireHighlight, layersModel, attentionHeat };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.peekLib = api;
 })(typeof window !== 'undefined' ? window : globalThis);

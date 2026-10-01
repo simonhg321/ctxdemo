@@ -127,7 +127,9 @@ peekPanels.tiles = (function () {
     onTurn(msg) {
       const t = msg && msg.turn, st = msg && msg.state, s = peekLib.stats(t && t.tokens);
       el.querySelector('#sure-big').innerHTML = t && t.tokens && t.tokens.length ? `${s.sure_pct}% <span class="dim" style="font-size:.55em">${s.sure_n} of ${s.n}</span>` : '—';
-      el.querySelector('#worst-big').textContent = s.worst ? `${vis(s.worst.chosen)} vs ${vis(s.worst.runner)}` : '—';
+      const wb = el.querySelector('#worst-big'); wb.textContent = s.worst ? `${vis(s.worst.chosen)} vs ${vis(s.worst.runner)}` : '—';
+      wb.style.fontSize = '';                                                     // measure at the tile's own size, then shrink until both halves show
+      wb.style.fontSize = peekLib.fitSize(1.9, wb.scrollWidth, wb.clientWidth) + 'em';
       el.querySelector('#worst-sub').textContent = s.worst && s.worst.runner_p != null ? `${peekLib.pct(s.worst.p)} vs ${peekLib.pct(s.worst.runner_p)}` : '';   // the odds: the whole lesson in one line
       el.querySelector('#pack-big').textContent = st && st.window_tokens ? Math.round(100 * st.next_would_send / st.window_tokens) + '%' : '—';
     },
