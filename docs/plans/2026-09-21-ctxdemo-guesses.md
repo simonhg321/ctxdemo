@@ -903,7 +903,7 @@ Expected: the answer window shows "Hi there!" within a second of opening (late-j
 - [ ] **Step 3: Verify live against Typhoon's Ollama** — tunnel + run locally:
 
 ```bash
-ssh -f -N -L 11436:127.0.0.1:11434 simonhg@192.168.10.137
+ssh -f -N -L 11436:127.0.0.1:11434 USER@HOME-BOX
 VLLM_URL=http://127.0.0.1:11436 VLLM_MODEL=qwen2.5:14b CTXDEMO_EXTRACT=0 CTXDEMO_TOKENIZER=Qwen/Qwen2.5-14B-Instruct .venv/bin/uvicorn app.main:app --port 8200 &
 SID=$(curl -s -X POST localhost:8200/api/session -H 'Content-Type: application/json' -d '{"mode":"compact","board":true,"peek":true}' | python3 -c 'import json,sys;print(json.load(sys.stdin)["session_id"])')
 curl -s -X POST localhost:8200/api/turn -H 'Content-Type: application/json' -d "{\"session_id\":\"$SID\",\"text\":\"Pick a number between 1 and 10\"}" | python3 -c 'import json,sys;t=json.load(sys.stdin)["turn"];print(t["user_chunks"]);print([(x["t"],x["p"]) for x in t["tokens"]][:8])'
