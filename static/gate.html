@@ -13,7 +13,8 @@
   p { color: var(--dim); margin: 0 0 1.6em; }
   form { display: flex; gap: .5em; justify-content: center; flex-wrap: wrap; }
   input { font: 1.1em ui-monospace, Menlo, Consolas, monospace; color: var(--bone); background: var(--panel); border: 1px solid var(--line);
-    border-radius: .4em; padding: .6em .9em; width: 13em; max-width: 100%; text-transform: uppercase; text-align: center; outline: none; }
+    border-radius: .4em; padding: .6em .9em; width: 17em; max-width: 100%; text-transform: uppercase; text-align: center; outline: none; }
+  input.login { text-transform: none; }
   input:focus { border-color: var(--ice); }
   input::placeholder { color: var(--dim); text-transform: none; }
   button { font: inherit; font-weight: 700; color: var(--ground); background: var(--amber); border: 0; border-radius: .4em; padding: .6em 1.3em; cursor: pointer; }
@@ -23,13 +24,13 @@
 </style></head>
 <body><main>
   <h1>See it <span>think</span></h1>
-  <p>Watch a language model choose its words, one token at a time.<br>Enter the key to come in.</p>
+  <p>Watch a language model choose its words, one token at a time.<br>Enter the key or your lab login to come in.</p>
   <form id="f" autocomplete="off">
-    <input id="key" name="key" type="text" placeholder="the key" autofocus autocapitalize="characters" autocorrect="off" spellcheck="false" aria-label="the key">
+    <input id="key" name="key" type="text" placeholder="the key, or name:password" autofocus autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="the key, or your lab login as name:password">
     <button id="go" type="submit">Enter</button>
   </form>
   <div id="msg" role="alert"></div>
-  <footer>Ask whoever sent you here for the key.</footer>
+  <footer>Ask whoever sent you here for the key. Lab users: type your login as name:password.</footer>
 </main>
 <script>
   // One key, checked on the server (POST /api/gate); a right key sets a cookie and sends you where you were going.
@@ -43,8 +44,10 @@
       if (r.ok) { location.replace(next()); return; }
       msg.textContent = r.status === 429 ? 'Too many tries. Wait a minute and try again.' : 'That key does not open the gate.';
     } catch (e) { msg.textContent = 'Could not reach the server: ' + e.message; }
-    go.disabled = false; key.value = ''; key.focus();
+    go.disabled = false; key.value = ''; key.type = 'text'; key.classList.remove('login'); key.focus();
   }
+  // a lab login (it has a colon) is a password: hide it and stop upper-casing it. A key stays readable.
+  key.addEventListener('input', () => { const login = key.value.includes(':'); key.type = login ? 'password' : 'text'; key.classList.toggle('login', login); });
   f.addEventListener('submit', e => { e.preventDefault(); if (key.value.trim()) open(key.value); });
   if (q.get('k')) { history.replaceState(null, '', '/gate' + (q.get('next') ? '?next=' + encodeURIComponent(q.get('next')) : '')); open(q.get('k')); }   // a QR or a bookmark: /gate?k=THE-KEY
 </script></body></html>

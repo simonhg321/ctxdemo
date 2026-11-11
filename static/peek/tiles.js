@@ -82,8 +82,9 @@ peekPanels.tiles = (function () {
     pick.style.display = pickOpen ? '' : 'none';
     if (pickOpen && !pick.innerHTML) {
       pick.innerHTML = '<select id="model-sel">' + models.models.map(m =>
-        `<option value="${esc(m.id)}"${m.current ? ' selected' : ''}>${esc(m.label)} — ${esc(m.note)}${m.cached ? '' : ' (not downloaded: slow)'}</option>`).join('') +
+        `<option value="${esc(m.id)}"${m.current ? ' selected' : ''}${m.tools === false ? ' class="no-tools" style="color:#e0553c"' : ''}>${m.tools === false ? '🔴 ' : ''}${esc(m.label)} — ${esc(m.note)}${m.cached ? '' : ' (not downloaded: slow)'}</option>`).join('') +
         '</select><input type="password" id="model-pw" placeholder="password or lab login (name:password)" autocomplete="off"><button type="button" id="model-go">Switch</button><span id="model-msg" class="dim"></span>' +
+        (models.models.some(m => m.tools === false) ? '<div class="no-tools" style="color:#e0553c">🔴 no tool calls: Hermes in the lab shells will not work while one of these is loaded</div>' : '') +
         '<div class="dim"><a href="#" id="model-about">what are these models? →</a></div>';
       pick.querySelector('#model-about').onclick = e => { e.preventDefault(); peekBus.send('explain', { id: 'models' }); };   // opens the "the models" card on the wall
       let sure = false;                                             // others are here and the presenter said "switch anyway"

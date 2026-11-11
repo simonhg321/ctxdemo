@@ -47,3 +47,10 @@ def test_file_is_reread_on_every_call(tmp_path):
     assert la.verify("simon:hunter2") is None and la.verify("simon:new-pw") == "simon"
     f.write_text("")                                               # the user is removed
     assert la.verify("simon:new-pw") is None
+
+
+def test_hash_of_is_the_one_line_for_that_name(tmp_path):
+    f = tmp_path / "htpasswd"; f.write_text(line("simon", "hunter2") + "dup a\ndup b\n")
+    la = LabAuth(f)
+    assert la.hash_of("simon").startswith("$2") and la.hash_of("nobody") is None and la.hash_of("dup") is None
+    assert LabAuth(None).hash_of("simon") is None

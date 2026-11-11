@@ -162,7 +162,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         return FileResponse(ROOT / "static" / "index.html")
 
     # The gate (Linode): Caddy's forward_auth asks /api/gate/check before every request; see app/gate.py.
-    gate = Gate(cfg.gate_file)
+    gate = Gate(cfg.gate_file, lab=labauth)            # a lab login is also a key
     app.state.gate = gate
 
     def caller(request: Request) -> str:

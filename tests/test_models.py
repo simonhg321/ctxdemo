@@ -68,3 +68,15 @@ def test_switch_to_the_model_already_running_is_refused(tmp_path):
     with pytest.raises(RuntimeError, match="already"):
         sw.switch("Qwen/Qwen3-8B-FP8", "pw", current="Qwen/Qwen3-8B-FP8")
     assert not env.exists() and calls == [] and sw.switching is None
+
+
+def test_the_shipped_list_says_which_models_cannot_call_tools():
+    """The switch list paints these red: Hermes in the lab shells needs tool calls."""
+    from app.models import load_models
+    assert {m["label"] for m in load_models() if not m["tools"]} == {"Qwen2.5 7B", "DeepSeek R1 7B", "Phi-4 mini", "Granite 3.3 2B"}
+
+
+def test_the_switch_list_marks_models_without_tool_calls():
+    from pathlib import Path
+    js = (Path(__file__).resolve().parent.parent / "static" / "peek" / "tiles.js").read_text()
+    assert "m.tools" in js and "no-tools" in js
