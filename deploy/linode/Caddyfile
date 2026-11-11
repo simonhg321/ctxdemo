@@ -28,6 +28,13 @@ demo.instockornot.club {
 			forward_auth ctxdemo:8200 {
 				uri /api/shell/check
 				copy_headers X-Lab-User
+				# a terminal is a websocket: the question to ctxdemo must be a plain GET, or uvicorn answers the handshake itself (403)
+				header_up -Upgrade
+				header_up -Connection
+				header_up -Sec-WebSocket-Key
+				header_up -Sec-WebSocket-Version
+				header_up -Sec-WebSocket-Protocol
+				header_up -Sec-WebSocket-Extensions
 			}
 			import /etc/caddy/auth/shell/*.caddy
 			redir /shell /shell/{http.request.header.X-Lab-User}/ 302
