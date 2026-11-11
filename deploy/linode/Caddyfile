@@ -53,6 +53,13 @@ demo.instockornot.club {
 	handle_path /monitor/* {
 		reverse_proxy host.docker.internal:19999
 	}
+	# /welcome/ — the lab's "start here" page. Behind the gate like everything else. The page itself is not in this repo:
+	# it lives on the box at /srv/data/caddy/site/welcome/index.html (copy a new one there; no reload needed).
+	redir /welcome /welcome/ 301
+	handle_path /welcome/* {
+		root * /etc/caddy/auth/site/welcome
+		file_server
+	}
 	redir /gpu /gpu/ 301
 	handle_path /gpu/* {
 		root * /etc/caddy/conf/site/gpu
