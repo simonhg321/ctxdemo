@@ -12,6 +12,11 @@
   h1 span { color: var(--amber); }
   p { color: var(--dim); margin: 0 0 1.6em; }
   form { display: flex; gap: .5em; justify-content: center; flex-wrap: wrap; }
+  form.login { flex-direction: column; align-items: center; }
+  a { color: var(--ice); }
+  #swap { display: inline-block; margin-top: 1.2em; font-size: .85em; }
+  #in { display: none; }
+  #in a.big { display: inline-block; font-weight: 700; color: var(--ground); background: var(--amber); border-radius: .4em; padding: .6em 1.3em; margin: .3em; text-decoration: none; }
   input { font: 1.1em ui-monospace, Menlo, Consolas, monospace; color: var(--bone); background: var(--panel); border: 1px solid var(--line);
     border-radius: .4em; padding: .6em .9em; width: 17em; max-width: 100%; text-transform: uppercase; text-align: center; outline: none; }
   input.login { text-transform: none; }
@@ -24,30 +29,48 @@
 </style></head>
 <body><main>
   <h1>See it <span>think</span></h1>
-  <p>Watch a language model choose its words, one token at a time.<br>Enter the key or your lab login to come in.</p>
-  <form id="f" autocomplete="off">
-    <input id="key" name="key" type="text" placeholder="the key, or name:password" autofocus autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="the key, or your lab login as name:password">
-    <button id="go" type="submit">Enter</button>
-  </form>
-  <div id="msg" role="alert"></div>
-  <footer>Ask whoever sent you here for the key. Lab users: type your login as name:password.</footer>
+  <div id="out">
+    <p id="lead">Watch a language model choose its words, one token at a time.<br>Sign in with your lab name and password.</p>
+    <form id="f" class="login">
+      <input id="name" name="username" class="login" type="text" placeholder="lab name" autofocus autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" aria-label="your lab name">
+      <input id="pw" name="password" class="login" type="password" placeholder="password" autocomplete="current-password" aria-label="your lab password">
+      <input id="key" name="key" type="text" placeholder="the key" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" aria-label="the key" style="display:none">
+      <button id="go" type="submit">Sign in</button>
+    </form>
+    <div id="msg" role="alert"></div>
+    <a href="#" id="swap">I have a key instead</a>
+    <footer>One sign-in opens the wall, typed questions, the model switch and your own shell. A shared key opens the wall only.</footer>
+  </div>
+  <div id="in">
+    <p>Signed in as <b id="who"></b>.</p>
+    <a class="big" href="/">The wall</a><a class="big" href="/shell/">My shell</a>
+    <p style="margin-top:1.6em"><a href="#" id="signout">Sign out</a></p>
+  </div>
 </main>
 <script>
-  // One key, checked on the server (POST /api/gate); a right key sets a cookie and sends you where you were going.
-  const q = new URLSearchParams(location.search), f = document.getElementById('f'), key = document.getElementById('key'),
-        go = document.getElementById('go'), msg = document.getElementById('msg');
-  const next = () => { const n = q.get('next') || '/'; return n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/gate') ? n : '/'; };   // same site only
-  async function open(k) {
+  // Sign in once (POST /api/gate): a right answer sets a cookie and sends you where you were going. A lab sign-in also opens
+  // typed questions, the model switch and that user's own shell; the shared key opens the wall only.
+  const q = new URLSearchParams(location.search), $ = id => document.getElementById(id), f = $('f'), go = $('go'), msg = $('msg');
+  const next = () => { const n = q.get('next') || ''; return n.startsWith('/') && !n.startsWith('//') && !n.startsWith('/gate') ? n : ''; };   // same site only
+  let byKey = false;
+  const mode = k => { byKey = k; f.classList.toggle('login', !k); $('name').style.display = $('pw').style.display = k ? 'none' : ''; $('key').style.display = k ? '' : 'none';
+    go.textContent = k ? 'Enter' : 'Sign in'; $('swap').textContent = k ? 'I have a lab name and password' : 'I have a key instead';
+    $('lead').innerHTML = 'Watch a language model choose its words, one token at a time.<br>' + (k ? 'Enter the key to come in.' : 'Sign in with your lab name and password.'); (k ? $('key') : $('name')).focus(); };
+  const hub = user => { $('out').style.display = 'none'; $('in').style.display = 'block'; $('who').textContent = user; };
+  async function open(body) {
     go.disabled = true; msg.textContent = '';
     try {
-      const r = await fetch('/api/gate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key: k }) });
-      if (r.ok) { location.replace(next()); return; }
-      msg.textContent = r.status === 429 ? 'Too many tries. Wait a minute and try again.' : 'That key does not open the gate.';
+      const r = await fetch('/api/gate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (r.ok) { const n = next(); if (n || body.key) { location.replace(n || '/'); } else { hub(body.name.trim()); } return; }   // came here on purpose: show both doors
+      msg.textContent = r.status === 429 ? 'Too many tries. Wait a minute and try again.' : byKey ? 'That key does not open the gate.' : 'That name and password do not match.';
     } catch (e) { msg.textContent = 'Could not reach the server: ' + e.message; }
-    go.disabled = false; key.value = ''; key.type = 'text'; key.classList.remove('login'); key.focus();
+    go.disabled = false; $('key').value = ''; $('pw').value = ''; (byKey ? $('key') : $('pw')).focus();
   }
-  // a lab login (it has a colon) is a password: hide it and stop upper-casing it. A key stays readable.
-  key.addEventListener('input', () => { const login = key.value.includes(':'); key.type = login ? 'password' : 'text'; key.classList.toggle('login', login); });
-  f.addEventListener('submit', e => { e.preventDefault(); if (key.value.trim()) open(key.value); });
-  if (q.get('k')) { history.replaceState(null, '', '/gate' + (q.get('next') ? '?next=' + encodeURIComponent(q.get('next')) : '')); open(q.get('k')); }   // a QR or a bookmark: /gate?k=THE-KEY
+  $('swap').onclick = e => { e.preventDefault(); msg.textContent = ''; mode(!byKey); };
+  f.addEventListener('submit', e => { e.preventDefault();
+    if (byKey) { if ($('key').value.trim()) open({ key: $('key').value }); }
+    else if ($('name').value.trim() && $('pw').value) open({ name: $('name').value, password: $('pw').value }); });
+  $('signout').onclick = async e => { e.preventDefault(); await fetch('/api/gate/out', { method: 'POST' }).catch(() => {}); location.replace('/gate'); };
+  if (q.get('k')) { history.replaceState(null, '', '/gate' + (q.get('next') ? '?next=' + encodeURIComponent(q.get('next')) : '')); mode(true); open({ key: q.get('k') }); }   // a QR or a bookmark: /gate?k=THE-KEY
+  else fetch('/api/me').then(r => r.ok ? r.json() : null).then(d => { if (d && d.user) { const n = next(); if (n) location.replace(n); else hub(d.user); } }).catch(() => {});   // already signed in
 </script></body></html>

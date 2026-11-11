@@ -5,7 +5,8 @@ cookie stops working because the cookie is an HMAC of the key. No file / empty f
 
 A lab login (`name:password`, app/labauth.py) is also a key. Its cookie is `lab.<name>.<HMAC of the gate key, the name and
 that user's stored hash>`: checking it is a file read, never a bcrypt, and it stops working when the user is removed, when
-their password changes, or when the gate key changes."""
+their password changes, or when the gate key changes. That cookie is the lab's one sign-in: `who()` names its user for the
+typed box, the model switch and Caddy's /shell/* check. The shared key's cookie is nobody in particular and opens only the wall."""
 from __future__ import annotations
 import hashlib, hmac, re, time
 from collections import defaultdict, deque
@@ -53,6 +54,16 @@ class Gate:
             return None
         return LAB + name + "." + hmac.new(key.encode(), f"ctxdemo-gate-lab-v1|{name}|{h}".encode(), hashlib.sha256).hexdigest()
 
+    def who(self, cookie: str | None) -> str | None:
+        """The lab user a cookie belongs to, or None (no gate, no cookie, the shared key's cookie, a forged or ended one).
+        A file read and an HMAC, never a bcrypt: Caddy asks this on every /shell/* request."""
+        k = self.key()
+        if not k or not cookie or not cookie.startswith(LAB):
+            return None
+        name = cookie[len(LAB):].rpartition(".")[0]
+        t = self.lab_token(name, k)
+        return name if t and hmac.compare_digest(cookie.encode("utf-8", "replace"), t.encode()) else None
+
     def allows(self, cookie: str | None) -> bool:
         k = self.key()
         if not k:
@@ -60,12 +71,7 @@ class Gate:
         if not cookie:
             return False
         c = cookie.encode("utf-8", "replace")         # bytes: compare_digest refuses non-ASCII strings
-        if hmac.compare_digest(c, self.token(k).encode()):
-            return True
-        if cookie.startswith(LAB):
-            t = self.lab_token(cookie[len(LAB):].rpartition(".")[0], k)
-            return bool(t) and hmac.compare_digest(c, t.encode())
-        return False
+        return hmac.compare_digest(c, self.token(k).encode()) or self.who(cookie) is not None
 
     def throttled(self, who: str) -> bool:
         q, t = self._misses[who], self._now()
@@ -82,6 +88,17 @@ class Gate:
         if k and self.lab and ":" in (key or ""):     # a lab login: exact case, one bcrypt (and only when that name exists)
             name = self.lab.verify(key.strip())
             value = self.lab_token(name, k) if name else None
+            if value:
+                self._misses.pop(who, None)
+                return value
+        self._misses[who].append(self._now())
+        return None
+
+    def try_login(self, name: str, password: str, who: str) -> str | None:
+        """The sign-in form: a lab user's name and password as two fields. The cookie value, or None (counted against `who`)."""
+        k, name = self.key(), (name or "").strip()
+        if k and self.lab and password and LAB_NAME.fullmatch(name) and self.lab.verify(name + ":" + password) == name:
+            value = self.lab_token(name, k)
             if value:
                 self._misses.pop(who, None)
                 return value

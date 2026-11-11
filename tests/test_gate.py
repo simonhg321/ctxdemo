@@ -134,5 +134,102 @@ def test_without_a_lab_file_a_login_is_just_a_wrong_key(gated):
     assert gated.get("/api/gate/check", headers={"accept": "application/json", "cookie": "gate=lab.ada.00"}).status_code == 401
 
 
-def test_the_gate_page_says_a_lab_login_works(labgated):
-    assert "name:password" in labgated.get("/gate").text
+def test_the_gate_page_is_a_sign_in_form_with_a_way_in_for_the_shared_key(labgated):
+    page = labgated.get("/gate").text
+    assert 'autocomplete="username"' in page and 'autocomplete="current-password"' in page and "I have a key instead" in page
+    assert "name:password" not in page                                                           # two fields now: nobody types a colon
+
+
+# --- one sign-in: the lab cookie also opens the typed box, the model switch and the user's own shell ---
+def _switcher(tmp_path):
+    from app.models import Switcher
+    return Switcher(models=[{"id": "fake", "label": "Fake", "note": "", "args": "", "tools": True, "tokenizer": "x"},
+                            {"id": "other", "label": "Other", "note": "", "args": "", "tools": True, "tokenizer": "x"}],
+                    env_file=tmp_path / ".env", compose_dir=tmp_path, hub_dir=tmp_path, password="switch-pw", runner=lambda cmd, cwd: 0)
+
+
+@pytest.fixture
+def signin(fake, cfg, keyfile, labfile, tmp_path):
+    return TestClient(create_app(vllm=fake, cfg=replace(cfg, gate_file=str(keyfile), lab_htpasswd=str(labfile)), switcher=_switcher(tmp_path)), follow_redirects=False)
+
+
+def _as(c, **body):
+    return {"cookie": "gate=" + _cookie(c.post("/api/gate", json=body))}
+
+
+def test_the_sign_in_form_sends_name_and_password_as_two_fields(signin):
+    r = signin.post("/api/gate", json={"name": " ada ", "password": "Mixed:Case1"})
+    assert r.status_code == 200 and _cookie(r).startswith("lab.ada.")
+    assert signin.post("/api/gate", json={"name": "ada", "password": "wrong"}).status_code == 403
+    assert signin.post("/api/gate", json={"name": "ada", "password": ""}).status_code == 403
+    assert signin.post("/api/gate", json={"name": "", "password": "Mixed:Case1"}).status_code == 403
+    assert signin.post("/api/gate", json={"name": "nobody", "password": "Mixed:Case1"}).status_code == 403
+    assert signin.post("/api/gate", json={"name": "ada:Mixed", "password": "Case1"}).status_code == 403     # the colon belongs to the password, never the name
+
+
+def test_who_is_signed_in(signin):
+    ada, key = _as(signin, name="ada", password="Mixed:Case1"), _as(signin, key="test-key-0000")
+    assert signin.get("/api/me", headers=ada).json() == {"user": "ada"}
+    assert signin.get("/api/me", headers=key).json() == {"user": None}                 # the shared key is nobody in particular
+    assert signin.get("/api/me").json() == {"user": None}
+    assert signin.get("/api/me", headers={"cookie": "gate=lab.ada.deadbeef"}).json() == {"user": None}
+
+
+def test_the_shell_check_names_a_lab_user_and_nobody_else(signin):
+    ada, lab2, key = _as(signin, name="ada", password="Mixed:Case1"), _as(signin, name="lab2", password="other-pw"), _as(signin, key="test-key-0000")
+    r = signin.get("/api/shell/check", headers=ada)
+    assert r.status_code == 204 and r.headers["x-lab-user"] == "ada"
+    assert signin.get("/api/shell/check", headers=lab2).headers["x-lab-user"] == "lab2"
+    # a name the caller sends is never believed: the answer comes from the cookie alone
+    assert signin.get("/api/shell/check", headers={**ada, "x-lab-user": "lab2"}).headers["x-lab-user"] == "ada"
+    spoof = signin.get("/api/shell/check", headers={"x-lab-user": "ada", "accept": "application/json"})
+    assert spoof.status_code == 401 and "x-lab-user" not in spoof.headers
+    # the shared key opens the wall, never a shell
+    k = signin.get("/api/shell/check", headers={**key, "accept": "text/html"})
+    assert k.status_code == 403 and "x-lab-user" not in k.headers
+    assert signin.get("/api/gate/check", headers=key).status_code == 204
+    # forged and borrowed cookies
+    mac = ada["cookie"].rsplit(".", 1)[1]
+    for forged in ("lab.ada.deadbeef", "lab.lab2." + mac, "lab..", "lab.ada"):
+        f = signin.get("/api/shell/check", headers={"cookie": "gate=" + forged, "accept": "application/json"})
+        assert f.status_code == 401 and "x-lab-user" not in f.headers
+
+
+def test_a_person_without_a_sign_in_is_sent_to_the_gate_and_back_to_their_shell(signin):
+    r = signin.get("/api/shell/check", headers={"accept": "text/html,*/*", "x-forwarded-uri": "/shell/", "x-forwarded-method": "GET"})
+    assert r.status_code == 302 and r.headers["location"] == "/gate?next=%2Fshell%2F"
+    assert signin.get("/api/shell/check", headers={"accept": "*/*", "x-forwarded-uri": "/shell/ada/ws"}).status_code == 401     # a websocket or a fetch: just no
+
+
+def test_a_shell_sign_in_ends_with_the_user_or_the_password(signin, labfile):
+    ada = _as(signin, name="ada", password="Mixed:Case1")
+    assert signin.get("/api/shell/check", headers=ada).status_code == 204
+    labfile.write_text(_line("ada", "new-password"))                                   # lab-user passwd ada
+    assert signin.get("/api/shell/check", headers={**ada, "accept": "application/json"}).status_code == 401
+    labfile.write_text(_line("lab2", "other-pw"))                                      # lab-user rm ada
+    assert signin.post("/api/gate", json={"name": "ada", "password": "new-password"}).status_code == 403
+
+
+def test_without_a_gate_there_are_no_shell_sign_ins(fake, cfg, labfile):
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, lab_htpasswd=str(labfile))), follow_redirects=False)
+    r = c.get("/api/shell/check", headers={"accept": "application/json", "cookie": "gate=lab.ada.x"})
+    assert r.status_code in (401, 403) and "x-lab-user" not in r.headers               # an open gate (no key file) must not mean open shells
+
+
+def test_a_signed_in_lab_user_types_and_switches_without_a_second_password(signin):
+    ada, key = _as(signin, name="ada", password="Mixed:Case1"), _as(signin, key="test-key-0000")
+    assert signin.post("/api/unlock", json={}, headers=ada).status_code == 200
+    assert signin.post("/api/unlock", json={}, headers=key).status_code == 403         # the shared key still needs the password
+    assert signin.post("/api/unlock", json={}).status_code == 403
+    assert signin.post("/api/unlock", json={"password": "switch-pw"}, headers=key).status_code == 200
+    assert signin.post("/api/unlock", json={"password": "ada:Mixed:Case1"}).status_code == 200   # the old way still works
+    assert signin.post("/api/model", json={"id": "nope"}, headers=ada).status_code == 400        # let in, then "not in the list"
+    assert signin.post("/api/model", json={"id": "other"}, headers=key).status_code == 403
+    assert signin.post("/api/model", json={"id": "other"}).status_code == 403
+    r = signin.post("/api/model", json={"id": "other"}, headers=ada)
+    assert r.status_code == 200 and r.json()["by"] == "ada"
+
+
+def test_signing_out_drops_the_cookie(signin):
+    r = signin.post("/api/gate/out")
+    assert r.status_code == 200 and "gate=" in r.headers["set-cookie"] and "Max-Age=0" in r.headers["set-cookie"]

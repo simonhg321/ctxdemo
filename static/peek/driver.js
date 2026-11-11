@@ -37,7 +37,7 @@ peekPanels.driver = (function () {
     mount(root) {
       el = root;
       el.innerHTML = '<div class="cap">ask the model</div><form id="f" style="display:flex;gap:.5em"><input type="text" id="q" placeholder="type a question" autocomplete="off"><button>Ask</button></form>' +
-        '<div id="lock" style="display:none;gap:.5em;align-items:center;font-size:.9em"><span class="dim" id="lock-msg">typed questions are locked on this wall — tap a prepared one below</span><button type="button" id="unlock">🔒 unlock</button><input type="password" id="unlock-pw" placeholder="password or lab login (name:password)" autocomplete="off" style="display:none;width:auto;flex:0 1 12em"><button type="button" id="unlock-go" style="display:none">Go</button></div>' +
+        '<div id="lock" style="display:none;gap:.5em;align-items:center;font-size:.9em"><span class="dim" id="lock-msg">typed questions are locked on this wall — tap a prepared one below</span><button type="button" id="unlock">🔒 unlock</button><input type="password" id="unlock-pw" placeholder="the switch password" autocomplete="off" style="display:none;width:auto;flex:0 1 12em"><button type="button" id="unlock-go" style="display:none">Go</button></div>' +
         '<div style="display:flex;gap:.5em;align-items:center;flex-wrap:wrap;font-size:.9em"><button id="new" type="button">Start over</button><button id="web" type="button" title="give it web search (a fresh session)">🌐 web: off</button><button id="win" type="button" title="context size (a fresh session)">🎒 4k</button><button id="cmp" type="button" title="when 95% full it writes itself a summary and drops the rest; off = let it overflow (a fresh session)">compact: on</button><input type="text" id="name" placeholder="your first name (optional)" maxlength="24" autocomplete="off" style="width:auto;flex:0 1 14em;display:none" title="shows next to your questions on the presenter\'s screen"><span id="st" class="dim"></span></div><div id="asks" style="display:flex;flex-wrap:wrap;gap:.3em;font-size:.8em;flex:1;min-height:0;overflow-y:auto;align-content:flex-start"></div>';
       const drawAsks = () => {
         const box = el.querySelector('#asks'); box.innerHTML = '';
@@ -71,6 +71,11 @@ peekPanels.driver = (function () {
           peekBus.send('unlock', {}); gate(); status('typed questions unlocked for this browser');
         } catch (e) { el.querySelector('#lock-msg').textContent = e.message; }
       };
+      fetch('../../api/me').then(r => r.ok ? r.json() : null).then(d => {            // one sign-in: a lab user's gate cookie already unlocks typing
+        if (!d || !d.user || unlocked) return;
+        unlocked = true; try { sessionStorage.setItem('ctxdemo_unlocked', '1'); } catch (e) { /* fine */ }
+        peekBus.send('unlock', {}); gate();
+      }).catch(() => {});
       el.querySelector('#unlock-go').onclick = tryUnlock;
       el.querySelector('#unlock-pw').onkeydown = e => { if (e.key === 'Enter') tryUnlock(); };
       peekBus.on('sampling', d => { sampling = peekLib.cleanSampling(d); if (!busy) status(sampling ? peekLib.samplingLine(sampling) : 'greedy again — the most likely token every time'); });

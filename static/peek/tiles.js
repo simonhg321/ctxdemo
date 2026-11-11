@@ -54,6 +54,8 @@ peekPanels.tiles = (function () {
   // the model tile: which model is answering, and (with the admin password) a switch to another from config/models.json.
   // A switch restarts vLLM (~1 min when the weights are cached); the tile counts, and the driver disables Ask meanwhile.
   let models = null, pickOpen = false;
+  let labUser = null;                                       // the signed-in lab user (the gate cookie), who may switch with nothing more to type
+  fetch('../../api/me').then(r => r.ok ? r.json() : null).then(d => { labUser = (d && d.user) || null; if (labUser && models) modelTile(); }).catch(() => {});
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   function modelTile() {
     if (!models) return;
@@ -75,7 +77,7 @@ peekPanels.tiles = (function () {
     } else {
       t.querySelector('#model-big').textContent = cur.label;
       t.querySelector('#model-sub').textContent = models.error ? 'last switch failed: ' + models.error : (cur.note || '');
-      t.querySelector('#model-hint').textContent = models.enabled ? (pickOpen ? '· pick one above' : '· tap the name to switch (needs the switch password or your lab login)') : '';
+      t.querySelector('#model-hint').textContent = models.enabled ? (pickOpen ? '· pick one above' : (labUser ? '· tap the name to switch (signed in as ' + labUser + ')' : '· tap the name to switch (needs the switch password)')) : '';
     }
     t.classList.toggle('switching', !!sw);
     const pick = t.querySelector('#model-pick');
@@ -83,7 +85,7 @@ peekPanels.tiles = (function () {
     if (pickOpen && !pick.innerHTML) {
       pick.innerHTML = '<select id="model-sel">' + models.models.map(m =>
         `<option value="${esc(m.id)}"${m.current ? ' selected' : ''}${m.tools === false ? ' class="no-tools" style="color:#e0553c"' : ''}>${m.tools === false ? '🔴 ' : ''}${esc(m.label)} — ${esc(m.note)}${m.cached ? '' : ' (not downloaded: slow)'}</option>`).join('') +
-        '</select><input type="password" id="model-pw" placeholder="password or lab login (name:password)" autocomplete="off"><button type="button" id="model-go">Switch</button><span id="model-msg" class="dim"></span>' +
+        '</select>' + (labUser ? '' : '<input type="password" id="model-pw" placeholder="the switch password" autocomplete="off">') + '<button type="button" id="model-go">Switch</button><span id="model-msg" class="dim"></span>' +
         (models.models.some(m => m.tools === false) ? '<div class="no-tools" style="color:#e0553c">🔴 no tool calls: Hermes in the lab shells will not work while one of these is loaded</div>' : '') +
         '<div class="dim"><a href="#" id="model-about">what are these models? →</a></div>';
       pick.querySelector('#model-about').onclick = e => { e.preventDefault(); peekBus.send('explain', { id: 'models' }); };   // opens the "the models" card on the wall
@@ -92,14 +94,14 @@ peekPanels.tiles = (function () {
       const calm = text => { sure = false; go.textContent = 'Switch'; msg.textContent = text || ''; };
       pick.querySelector('#model-sel').onchange = () => calm('');
       go.onclick = async () => {
-        const id = pick.querySelector('#model-sel').value, pw = pick.querySelector('#model-pw').value;
+        const id = pick.querySelector('#model-sel').value, pwEl = pick.querySelector('#model-pw'), pw = pwEl ? pwEl.value : '';   // no box: the sign-in cookie speaks
         const r = await fetch('../../api/model', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ id, password: pw, here: myId() }, sure ? { confirm: true } : {})) });
         if (!r.ok) {
           const d = (await r.json().catch(() => ({}))).detail;
           if (d && d.busy) { sure = true; go.textContent = 'Switch anyway'; msg.textContent = d.message + '. A switch takes the wall away from everyone for a minute or more.'; return; }
           calm(typeof d === 'string' ? d : r.statusText); return;
         }
-        calm(''); pick.querySelector('#model-pw').value = ''; pickOpen = false; pollModels();
+        calm(''); if (pwEl) pwEl.value = ''; pickOpen = false; pollModels();
       };
     }
   }

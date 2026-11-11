@@ -75,7 +75,7 @@ class TurnReq(BaseModel):
 
 
 class UnlockReq(BaseModel):
-    password: str
+    password: str = ""               # empty: the caller is relying on their lab sign-in cookie
 
 
 class HereReq(BaseModel):
@@ -186,12 +186,43 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         who = caller(request)
         if gate.throttled(who):
             raise HTTPException(429, "too many tries; wait a minute")
-        value = gate.try_key(str(body.get("key", "")), who)
+        if "name" in body or "password" in body:                 # the sign-in form: a lab user's name and password
+            value = gate.try_login(str(body.get("name", "")), str(body.get("password", "")), who)
+        else:
+            value = gate.try_key(str(body.get("key", "")), who)
         if not value:
-            raise HTTPException(403, "that key does not open the gate")
+            raise HTTPException(403, "that does not open the gate")
         r = JSONResponse({"ok": True})
         r.set_cookie(GATE_COOKIE, value, max_age=GATE_MAX_AGE, httponly=True, secure=request.headers.get("x-forwarded-proto", "https") == "https", samesite="lax", path="/")
         return r
+
+    def lab_user(request: Request) -> str | None:
+        """The signed-in lab user, from the gate cookie alone. Never from a header: anyone can send a header."""
+        return gate.who(request.cookies.get(GATE_COOKIE))
+
+    @app.post("/api/gate/out")
+    def gate_out():
+        r = JSONResponse({"ok": True})
+        r.delete_cookie(GATE_COOKIE, path="/")
+        return r
+
+    @app.get("/api/me")
+    def me(request: Request):
+        return {"user": lab_user(request)}
+
+    @app.get("/api/shell/check")
+    def shell_check(request: Request):
+        """Caddy's forward_auth for /shell/*: 204 and X-Lab-User for a signed-in lab user, and for nobody else. Caddy routes on
+        that header to the user's own container. The shared key's cookie opens the wall, never a shell."""
+        name = lab_user(request)
+        if name:
+            return Response(status_code=204, headers={"X-Lab-User": name})
+        if gate.enabled and gate.allows(request.cookies.get(GATE_COOKIE)):
+            raise HTTPException(403, "the shared key does not open a shell: sign in with your lab name and password at /gate")
+        uri = request.headers.get("x-forwarded-uri") or "/shell/"
+        if request.headers.get("x-forwarded-method", "GET") == "GET" and "text/html" in request.headers.get("accept", ""):
+            return RedirectResponse("/gate?next=" + quote(uri, safe=""), status_code=302)
+        raise HTTPException(401, "sign in at /gate with your lab name and password")
 
     AUDIENCE_WINDOW, AUDIENCE_MAX_TOKENS = 4096, 600
 
@@ -237,17 +268,19 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         index: int | None = None     # which token of the last answer; None/0 = the first
 
     @app.post("/api/unlock")
-    def unlock(req: UnlockReq = Body(...)):
+    def unlock(request: Request, req: UnlockReq = Body(default=UnlockReq())):
         """CTXDEMO_FREETEXT=password: does this password open the typed-question box? Read-only on purpose: checking a credential must never
         restart the model (last night's incident was a same-model 'switch' used as a password check)."""
         ok = {p for p in (cfg.admin_password, getattr(switcher, "password", "")) if p}   # whoever may switch the model may also type
-        if req.password not in ok and not (labauth is not None and labauth.verify(req.password)):   # …and so may a lab login
+        if lab_user(request):                                    # …and so may a signed-in lab user, with nothing more to type
+            return {"ok": True}
+        if not req.password or (req.password not in ok and not (labauth is not None and labauth.verify(req.password))):   # …or a lab login typed here
             raise HTTPException(403, "wrong password")
         return {"ok": True}
 
     @app.post("/api/model")
-    def set_model(req: ModelReq = Body(...)):
-        by = switcher.authorize(req.password)
+    def set_model(request: Request, req: ModelReq = Body(...)):
+        by = (lab_user(request) if switcher.enabled else None) or switcher.authorize(req.password)   # the sign-in cookie, or a typed password
         if not by:
             raise HTTPException(403, "wrong password")            # checked first: the head count is not for strangers
         if not switcher.info(req.id):
@@ -256,7 +289,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         if busy and not req.confirm:                              # a switch takes the wall away from everyone for a minute or more
             raise HTTPException(409, {"busy": True, "message": busy})
         try:
-            st = switcher.switch(req.id, req.password, current=current_model())
+            st = switcher.switch(req.id, req.password, current=current_model(), by=by)
             log.info("model switch by %s → %s", "presenter" if by == "presenter" else "lab user " + by, req.id)
             return st
         except PermissionError:

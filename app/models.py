@@ -62,8 +62,8 @@ class Switcher:
             return "presenter"
         return self.verifier(password) if self.verifier else None
 
-    def switch(self, model_id: str, password: str, current: str | None = None) -> dict:
-        by = self.authorize(password)
+    def switch(self, model_id: str, password: str = "", current: str | None = None, by: str | None = None) -> dict:
+        by = (by if self.enabled else None) or self.authorize(password)   # `by`: a lab user the caller already knows from their sign-in cookie
         if not by:
             raise PermissionError("wrong password")
         m = self.info(model_id)
