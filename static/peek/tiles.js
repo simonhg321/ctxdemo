@@ -75,7 +75,7 @@ peekPanels.tiles = (function () {
     } else {
       t.querySelector('#model-big').textContent = cur.label;
       t.querySelector('#model-sub').textContent = models.error ? 'last switch failed: ' + models.error : (cur.note || '');
-      t.querySelector('#model-hint').textContent = models.enabled ? (pickOpen ? '· pick one above' : '· tap the name to switch (needs the password)') : '';
+      t.querySelector('#model-hint').textContent = models.enabled ? (pickOpen ? '· pick one above' : '· tap the name to switch (needs the switch password or your lab login)') : '';
     }
     t.classList.toggle('switching', !!sw);
     const pick = t.querySelector('#model-pick');
@@ -83,7 +83,7 @@ peekPanels.tiles = (function () {
     if (pickOpen && !pick.innerHTML) {
       pick.innerHTML = '<select id="model-sel">' + models.models.map(m =>
         `<option value="${esc(m.id)}"${m.current ? ' selected' : ''}>${esc(m.label)} — ${esc(m.note)}${m.cached ? '' : ' (not downloaded: slow)'}</option>`).join('') +
-        '</select><input type="password" id="model-pw" placeholder="password" autocomplete="off"><button type="button" id="model-go">Switch</button><span id="model-msg" class="dim"></span>' +
+        '</select><input type="password" id="model-pw" placeholder="password or lab login (name:password)" autocomplete="off"><button type="button" id="model-go">Switch</button><span id="model-msg" class="dim"></span>' +
         '<div class="dim"><a href="#" id="model-about">what are these models? →</a></div>';
       pick.querySelector('#model-about').onclick = e => { e.preventDefault(); peekBus.send('explain', { id: 'models' }); };   // opens the "the models" card on the wall
       let sure = false;                                             // others are here and the presenter said "switch anyway"

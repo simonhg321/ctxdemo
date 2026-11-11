@@ -15,6 +15,7 @@ from .tools import Tools
 from .chunks import Chunker
 from .turnlog import TurnLog, hesitations
 from .models import Switcher, load_models, host_restarts
+from .labauth import LabAuth
 from .gate import Gate, COOKIE as GATE_COOKIE, MAX_AGE as GATE_MAX_AGE
 from .presence import Presence, busy_line
 from collections import deque
@@ -90,8 +91,10 @@ class ListenReq(BaseModel):
     off: bool = False            # the off button: close the window now
 
 
-def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=None, personas=None, netdata_transport=None, switcher=None, layers_transport=None) -> FastAPI:
+def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=None, personas=None, netdata_transport=None, switcher=None, layers_transport=None, labauth=None) -> FastAPI:
     cfg = cfg or config.load()
+    if labauth is None and cfg.lab_htpasswd:
+        labauth = LabAuth(Path(cfg.lab_htpasswd))   # lab logins (name:password) may unlock typing and switch the model
     personas = personas if personas is not None else load_personas()
     if ears is None and cfg.ears_url:
         ears = Ears(cfg.ears_url)
@@ -133,6 +136,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
                             hub_dir=Path(cfg.hf_hub_dir or "/nonexistent"), password=switch_pw, runner=host_restarts,
                             wait_for=lambda mid: vllm.wait_for_model(mid) if hasattr(vllm, "wait_for_model") else True, on_switched=switched)
     switcher = switcher or Switcher(models=[], env_file=Path("/nonexistent/.env"), compose_dir=Path("/nonexistent"), hub_dir=Path("/nonexistent"), password="")
+    if labauth is not None and getattr(switcher, "verifier", True) is None:
+        switcher.verifier = labauth.verify            # the switch and its pre-check use the same rule
     current_model = lambda: getattr(vllm, "model", cfg.model)
     scr = script_mod.load()
     app = FastAPI(title="ctxdemo")
@@ -236,13 +241,14 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         """CTXDEMO_FREETEXT=password: does this password open the typed-question box? Read-only on purpose: checking a credential must never
         restart the model (last night's incident was a same-model 'switch' used as a password check)."""
         ok = {p for p in (cfg.admin_password, getattr(switcher, "password", "")) if p}   # whoever may switch the model may also type
-        if req.password not in ok:
+        if req.password not in ok and not (labauth is not None and labauth.verify(req.password)):   # …and so may a lab login
             raise HTTPException(403, "wrong password")
         return {"ok": True}
 
     @app.post("/api/model")
     def set_model(req: ModelReq = Body(...)):
-        if not switcher.enabled or req.password != switcher.password:
+        by = switcher.authorize(req.password)
+        if not by:
             raise HTTPException(403, "wrong password")            # checked first: the head count is not for strangers
         if not switcher.info(req.id):
             raise HTTPException(400, "not in the list")
@@ -250,7 +256,9 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         if busy and not req.confirm:                              # a switch takes the wall away from everyone for a minute or more
             raise HTTPException(409, {"busy": True, "message": busy})
         try:
-            return switcher.switch(req.id, req.password, current=current_model())
+            st = switcher.switch(req.id, req.password, current=current_model())
+            log.info("model switch by %s → %s", "presenter" if by == "presenter" else "lab user " + by, req.id)
+            return st
         except PermissionError:
             raise HTTPException(403, "wrong password")
         except ValueError:

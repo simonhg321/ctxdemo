@@ -55,6 +55,7 @@ services:
       - CTXDEMO_SWITCH_PASSWORD=${CTXDEMO_SWITCH_PASSWORD:-} # the model switch's own password (from .env); empty = the admin password does both
       - CTXDEMO_COMPOSE_DIR=/srv/compose                     # where .env lives inside the container
       - CTXDEMO_HF_HUB=/srv/data/hf/hub
+      - CTXDEMO_LAB_HTPASSWD=/srv/data/lab/htpasswd-shell     # lab logins (name:password) may unlock typing and switch the model
       - CTXDEMO_GATE_FILE=/srv/data/gate/key                  # the gate key: one line in this file on the host; edit it to change the key (no restart)
       # - CTXDEMO_AUDIENCE=1                           # put back to clamp plain visitors (4k / 600 tokens / no web); /presenter/ keeps the full set
     volumes:
@@ -62,6 +63,7 @@ services:
       - /srv/projects/ctxdemo/deploy/linode:/srv/compose      # the model switch writes .env here; the host's path unit does the restart
       - /srv/data/hf/hub:/srv/data/hf/hub:ro                # to flag which models are already downloaded
       - /srv/data/gate:/srv/data/gate:ro                    # the gate key file
+      - /srv/data/caddy:/srv/data/lab:ro                    # lab logins may unlock typing and switch the model (htpasswd-shell); the DIRECTORY: lab-user/rm-shell-user replace the file
     extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:
       vllm: { condition: service_healthy }

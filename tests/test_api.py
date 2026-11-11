@@ -650,3 +650,41 @@ def test_switch_has_its_own_password_and_asks_before_interrupting(fake, cfg, tmp
     assert r.status_code == 409 and r.json()["detail"]["message"] == "1 answer is in progress"
     t = c.get("/static/peek/tiles.js").text
     assert "confirm: true" in t and "Switch anyway" in t
+
+
+def test_a_lab_login_unlocks_typing_and_switches_the_model(fake, cfg, tmp_path, caplog):
+    # NFCU: a lab user's own `name:password` (Caddy's htpasswd-shell) works wherever the switch password does
+    import bcrypt, logging
+    from dataclasses import replace
+    from app.labauth import LabAuth
+    from app.models import Switcher
+    htp = tmp_path / "htpasswd-shell"
+    htp.write_text(f"ada {bcrypt.hashpw(b'lab-pw', bcrypt.gensalt(rounds=4)).decode()}\n")
+    calls = []
+    sw = Switcher(models=[{"id": "fake", "label": "Fake", "note": "", "args": "", "tools": True, "tokenizer": "x"},
+                          {"id": "other", "label": "Other", "note": "", "args": "--y", "tools": False, "tokenizer": "y"}],
+                  env_file=tmp_path / ".env", compose_dir=tmp_path, hub_dir=tmp_path, password="switch-pw",
+                  runner=lambda cmd, cwd: calls.append(cmd) or 0, wait_for=lambda mid: True, on_switched=lambda m: setattr(fake, "model", m["id"]))
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, freetext="password", admin_password="pw", switch_password="switch-pw"),
+                              switcher=sw, labauth=LabAuth(htp)))
+    assert c.post("/api/unlock", json={"password": "ada:lab-pw"}).json() == {"ok": True}
+    assert c.post("/api/unlock", json={"password": "ada:wrong"}).status_code == 403
+    assert c.post("/api/unlock", json={"password": "bob:lab-pw"}).status_code == 403
+    assert c.post("/api/unlock", json={"password": "switch-pw"}).json() == {"ok": True}       # the shared passwords still work
+    assert sw.switching is None and not calls                                                # unlocking never restarts the model
+    assert c.post("/api/model", json={"id": "other", "password": "ada:wrong"}).status_code == 403
+    assert c.post("/api/model", json={"id": "fake", "password": "ada:lab-pw"}).json()["detail"] == "already on that model"   # passed the password
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
+        r = c.post("/api/model", json={"id": "other", "password": "ada:lab-pw"})
+    assert r.status_code == 200 and r.json()["by"] == "ada" and r.json()["switching"]["target"] == "other"
+    assert "model switch by lab user ada → other" in caplog.text and "lab-pw" not in caplog.text
+    sw.join(5)
+    assert calls and calls[0][:2] == ["docker", "compose"]
+    with caplog.at_level(logging.INFO, logger="uvicorn.error"):
+        r = c.post("/api/model", json={"id": "fake", "password": "switch-pw"})
+    assert r.status_code == 200 and "by" not in r.json() and "model switch by presenter → fake" in caplog.text
+    sw.join(5)
+    no_lab = TestClient(create_app(vllm=fake, cfg=replace(cfg, freetext="password", admin_password="pw"), switcher=Switcher(
+        models=sw.models, env_file=tmp_path / ".env2", compose_dir=tmp_path, hub_dir=tmp_path, password="switch-pw")))
+    assert no_lab.post("/api/unlock", json={"password": "ada:lab-pw"}).status_code == 403   # no htpasswd configured: lab logins mean nothing
+    assert no_lab.post("/api/model", json={"id": "other", "password": "ada:lab-pw"}).status_code == 403

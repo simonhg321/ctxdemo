@@ -27,10 +27,11 @@ def host_restarts(cmd: list[str], cwd: Path) -> int:
 class Switcher:
     def __init__(self, models: list[dict], env_file: Path, compose_dir: Path, hub_dir: Path, password: str,
                  runner: Callable[[list[str], Path], int] | None = None, wait_for: Callable[[str], bool] | None = None,
-                 on_switched: Callable[[dict], None] | None = None):
+                 on_switched: Callable[[dict], None] | None = None, verifier: Callable[[str], str | None] | None = None):
         self.models = models
         self.env_file, self.compose_dir, self.hub_dir = Path(env_file), Path(compose_dir), Path(hub_dir)
         self.password = password
+        self.verifier = verifier                      # lab logins: `name:password` -> name, or None (app/labauth.py)
         self._run = runner or _run
         self._wait = wait_for or (lambda model_id: True)     # blocks until the server serves model_id (the old one stays healthy until the restart begins)
         self._on_switched = on_switched or (lambda m: None)
@@ -53,8 +54,17 @@ class Switcher:
         return {"current": current, "switching": self.switching, "enabled": self.enabled, "error": self.last_error,
                 "models": [{**m, "cached": self._cached(m["id"]), "current": m["id"] == current} for m in self.models]}
 
+    def authorize(self, password: str) -> str | None:
+        """Who may switch: "presenter" for the switch password, a lab user's name for their `name:password`, else None."""
+        if not self.enabled or not password:
+            return None
+        if password == self.password:
+            return "presenter"
+        return self.verifier(password) if self.verifier else None
+
     def switch(self, model_id: str, password: str, current: str | None = None) -> dict:
-        if not self.enabled or password != self.password:
+        by = self.authorize(password)
+        if not by:
             raise PermissionError("wrong password")
         m = self.info(model_id)
         if not m:
@@ -70,6 +80,8 @@ class Switcher:
         keep = [l for l in (self.env_file.read_text().splitlines() if self.env_file.exists() else []) if not l.startswith(("MODEL=", "MODEL_ARGS="))]
         self.env_file.write_text("\n".join([f"MODEL={model_id}", f"MODEL_ARGS={m['args']}", *keep]).rstrip("\n") + "\n")
         st = self.status(current=None)                # snapshot before the thread runs: a fast restart would already show idle
+        if by != "presenter":
+            st["by"] = by                             # a lab user switched: the wall can say who
         self._thread = threading.Thread(target=self._restart, args=(m,), daemon=True)
         self._thread.start()
         return st
