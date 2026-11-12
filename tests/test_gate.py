@@ -233,3 +233,14 @@ def test_a_signed_in_lab_user_types_and_switches_without_a_second_password(signi
 def test_signing_out_drops_the_cookie(signin):
     r = signin.post("/api/gate/out")
     assert r.status_code == 200 and "gate=" in r.headers["set-cookie"] and "Max-Age=0" in r.headers["set-cookie"]
+
+
+def test_the_wall_pages_carry_the_sign_out_link(signin):
+    """Both wall pages load signout.js, which shows who is signed in and clears the cookie via /api/gate/out."""
+    from pathlib import Path
+    static = Path(__file__).resolve().parent.parent / "static"
+    js = (static / "signout.js").read_text()
+    assert "api/me" in js and "api/gate/out" in js and "'gate'" in js
+    assert 'src="static/signout.js"' in (static / "index.html").read_text()            # relative, like every other path on the wall
+    assert 'src="../signout.js"' in (static / "peek" / "wall.html").read_text()
+    assert signin.get("/static/signout.js").status_code in (200, 401)                  # it exists (the gate may ask for a sign-in first)
