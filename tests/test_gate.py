@@ -170,7 +170,7 @@ def test_the_sign_in_form_sends_name_and_password_as_two_fields(signin):
 def test_who_is_signed_in(signin):
     ada, key = _as(signin, name="ada", password="Mixed:Case1"), _as(signin, key="test-key-0000")
     assert signin.get("/api/me", headers=ada).json() == {"user": "ada"}
-    assert signin.get("/api/me", headers=key).json() == {"user": None}                 # the shared key is nobody in particular
+    assert signin.get("/api/me", headers=key).json() == {"user": None, "key": True}                 # the shared key is nobody in particular
     assert signin.get("/api/me").json() == {"user": None}
     assert signin.get("/api/me", headers={"cookie": "gate=lab.ada.deadbeef"}).json() == {"user": None}
 
@@ -241,6 +241,7 @@ def test_the_wall_pages_carry_the_sign_out_link(signin):
     static = Path(__file__).resolve().parent.parent / "static"
     js = (static / "signout.js").read_text()
     assert "api/me" in js and "api/gate/out" in js and "'gate'" in js
+    assert "d.key" in js                                                               # a shared-key visitor gets the link too, to switch to a named login
     assert 'src="static/signout.js"' in (static / "index.html").read_text()            # relative, like every other path on the wall
     assert 'src="../signout.js"' in (static / "peek" / "wall.html").read_text()
     assert signin.get("/static/signout.js").status_code in (200, 401)                  # it exists (the gate may ask for a sign-in first)

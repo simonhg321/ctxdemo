@@ -208,7 +208,10 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
 
     @app.get("/api/me")
     def me(request: Request):
-        return {"user": lab_user(request)}
+        user = lab_user(request)
+        if user is None and gate.enabled and gate.allows(request.cookies.get(GATE_COOKIE)):
+            return {"user": None, "key": True}   # in on the shared key: nobody in particular, but signed in (the wall offers Sign out)
+        return {"user": user}
 
     @app.get("/api/shell/check")
     def shell_check(request: Request):
