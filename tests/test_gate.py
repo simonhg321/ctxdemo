@@ -241,6 +241,7 @@ def test_the_wall_pages_carry_the_sign_out_link(signin):
     static = Path(__file__).resolve().parent.parent / "static"
     js = (static / "signout.js").read_text()
     assert "api/me" in js and "api/gate/out" in js and "'gate'" in js
+    assert "'shell/'" in js                                                            # named logins get a link to their shell
     assert "d.key" in js                                                               # a shared-key visitor gets the link too, to switch to a named login
     assert 'src="static/signout.js"' in (static / "index.html").read_text()            # relative, like every other path on the wall
     assert 'src="../signout.js"' in (static / "peek" / "wall.html").read_text()
