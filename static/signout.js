@@ -9,6 +9,7 @@
     const out = document.createElement('a'); out.href = root + 'gate'; out.textContent = 'Sign out'; out.style.color = 'inherit';
     out.onclick = async e => { e.preventDefault(); await fetch(root + 'api/gate/out', { method: 'POST' }).catch(() => {}); location.replace(root + 'gate'); };
     const shell = document.createElement('a'); shell.href = root + 'shell/'; shell.textContent = 'My shell'; shell.target = '_blank'; shell.rel = 'noopener'; shell.style.color = 'inherit';
+    shell.onclick = (e) => { e.preventDefault(); window.open(shell.href, '_blank', 'popup,width=1100,height=720'); };   // its own window every click: one for Hermes, another for a plain shell
     if (d.user) box.append('Signed in as ', name, ' · ', shell, ' · ', out);     // shells belong to named logins; the shared key has none
     else box.append('In on the shared key · ', out);
     const slot = document.querySelector('[data-whoami]');                      // a page with a header gives it a place
