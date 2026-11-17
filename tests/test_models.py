@@ -73,7 +73,7 @@ def test_switch_to_the_model_already_running_is_refused(tmp_path):
 def test_the_shipped_list_says_which_models_cannot_call_tools():
     """The switch list paints these red: Hermes in the lab shells needs tool calls."""
     from app.models import load_models
-    assert {m["label"] for m in load_models() if not m["tools"]} == {"Qwen2.5 7B", "DeepSeek R1 7B", "Phi-4 mini", "Granite 3.3 2B", "Qwen3 8B, refusals removed", "Gemma 4 12B, refusals removed"}
+    assert {m["label"] for m in load_models() if not m["tools"]} == {"Qwen2.5 7B", "DeepSeek R1 7B", "Phi-4 mini", "Granite 3.3 2B", "Qwen3 8B abliterated", "Gemma 4 12B abliterated"}
 
 
 def test_the_switch_list_marks_models_without_tool_calls():
@@ -82,20 +82,18 @@ def test_the_switch_list_marks_models_without_tool_calls():
     assert "m.tools" in js and "no-tools" in js
 
 
-def test_presenter_only_models_are_refused_to_ordinary_lab_logins(tmp_path):
-    """The abliterated demo models: the switch password or the simon login may load them; lab3 may not."""
+def test_any_lab_login_may_load_an_abliterated_model(tmp_path):
+    """Simon, 2026-11-17: no special login for these; the label is the guard, not the switch."""
     calls = []
     sw, env = make(tmp_path, calls)
-    sw.models.append({"id": "x/abliterated", "label": "x", "note": "", "args": "", "tools": False, "tokenizer": "x", "presenter_only": True})
-    with pytest.raises(PermissionError):
-        sw.switch("x/abliterated", by="lab3")
-    assert not calls and sw.switching is None and not env.exists()
-    assert sw.switch("x/abliterated", by="simon")["switching"]["target"] == "x/abliterated"; sw.join(5)
-    assert sw.switch("Qwen/Qwen3-4B-FP8", "pw")["switching"]["target"] == "Qwen/Qwen3-4B-FP8"; sw.join(5)   # ordinary models stay open
-    assert sw.switch("x/abliterated", "pw")["switching"]["target"] == "x/abliterated"; sw.join(5)       # the switch password is the presenter
+    sw.models.append({"id": "x/abliterated", "label": "x", "note": "", "args": "", "tools": False, "tokenizer": "x", "abliterated": True})
+    assert sw.switch("x/abliterated", by="lab3")["switching"]["target"] == "x/abliterated"; sw.join(5)
 
 
-def test_the_shipped_abliterated_models_are_presenter_only_and_toolless():
+def test_the_shipped_abliterated_models_are_labeled_and_toolless():
+    from pathlib import Path
     ms = [m for m in load_models() if "abliterated" in m["id"].lower()]
-    assert len(ms) == 2 and all(m.get("presenter_only") and m["tools"] is False and "enable-auto-tool-choice" not in m["args"] for m in ms)
-    assert not any(m.get("presenter_only") for m in load_models() if "abliterated" not in m["id"].lower())
+    assert len(ms) == 2 and all(m.get("abliterated") and m["tools"] is False and "abliterated" in m["label"] and "ABLITERATED" in m["note"] for m in ms)
+    assert not any("presenter_only" in m for m in load_models())
+    js = (Path(__file__).resolve().parent.parent / "static" / "peek" / "tiles.js").read_text()
+    assert "m.abliterated" in js and "cur.abliterated" in js

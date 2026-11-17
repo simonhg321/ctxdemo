@@ -1,5 +1,5 @@
 {
- "_comment": "Models the wall may switch vLLM to (NFCU Linode, 20 GB card). All open, none gated on Hugging Face. `args` are vLLM flags per model; `tools` = has a tool-call parser (the web toggle); `tokenizer` = HF repo for the chunk strip. Batch of 2026-09-26 (Simon: 'grab em all'): each booted once on the box with the wall's flags and answered with logprobs (trial log in JOURNAL); inclusionAI/Ling-3.0-tiny dropped (Triton shared-memory limit on Ada), XHToken/Spark-X2.5-4B dropped (architecture not in vLLM 0.30). Tool flags swept 2026-11-10 (direct tool call + a real Hermes tool call per model): `tools` is true only where both passed; Qwen2.5 GPTQ emits broken tool JSON, Granite passes direct but not Hermes, Phi-4 mini and DeepSeek R1 never call. Added 2026-11-17 (Simon): two ABLITERATED models (refusal behaviour removed by a third party) for the guardrails side-by-side. `presenter_only` = only the switch password or the `simon` login may load them; `tools` is false on purpose so the wall offers no tools and the lab shells' hermes wrapper refuses to start on them.",
+ "_comment": "Models the wall may switch vLLM to (NFCU Linode, 20 GB card). All open, none gated on Hugging Face. `args` are vLLM flags per model; `tools` = has a tool-call parser (the web toggle); `tokenizer` = HF repo for the chunk strip. Batch of 2026-09-26 (Simon: 'grab em all'): each booted once on the box with the wall's flags and answered with logprobs (trial log in JOURNAL); inclusionAI/Ling-3.0-tiny dropped (Triton shared-memory limit on Ada), XHToken/Spark-X2.5-4B dropped (architecture not in vLLM 0.30). Tool flags swept 2026-11-10 (direct tool call + a real Hermes tool call per model): `tools` is true only where both passed; Qwen2.5 GPTQ emits broken tool JSON, Granite passes direct but not Hermes, Phi-4 mini and DeepSeek R1 never call. Added 2026-11-17 (Simon): two ABLITERATED models (refusal behaviour removed by a third party) for the guardrails side-by-side. `abliterated` = the wall labels them in red; anyone who may switch models may load them (Simon, 2026-11-17: no special login); `tools` is false on purpose so the wall offers no tools and the lab shells' hermes wrapper refuses to start on them.",
  "models": [
   {
    "id": "Qwen/Qwen3-8B-FP8",
@@ -121,21 +121,21 @@
   },
   {
    "id": "huihui-ai/Huihui-Qwen3-8B-abliterated-v2",
-   "label": "Qwen3 8B, refusals removed",
-   "note": "DEMO ONLY: Qwen3 8B with its refusals stripped out by a third party. Compare with Qwen3 8B. Presenter only",
+   "label": "Qwen3 8B abliterated",
+   "note": "ABLITERATED: Qwen3 8B with its refusals stripped out by a third party. It will say things the stock model will not. Compare with Qwen3 8B",
    "args": "--reasoning-parser qwen3 --max-model-len 16384",
    "tools": false,
    "tokenizer": "Qwen/Qwen3-8B",
-   "presenter_only": true
+   "abliterated": true
   },
   {
    "id": "AEON-7/Gemma-4-12B-it-AEON-Abliterated-K4-FP8",
-   "label": "Gemma 4 12B, refusals removed",
-   "note": "DEMO ONLY: Gemma 4 12B with its refusals stripped out by a third party. Compare with Gemma 4 12B. Presenter only",
+   "label": "Gemma 4 12B abliterated",
+   "note": "ABLITERATED: Gemma 4 12B with its refusals stripped out by a third party. It will say things the stock model will not. Compare with Gemma 4 12B",
    "args": "--reasoning-parser gemma4",
    "tools": false,
    "tokenizer": "google/gemma-4-12B-it-qat-w4a16-ct",
-   "presenter_only": true
+   "abliterated": true
   }
  ]
 }

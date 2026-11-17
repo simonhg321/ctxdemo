@@ -14,7 +14,7 @@ from .vllm import VLLM, clamp_sampling
 from .tools import Tools
 from .chunks import Chunker
 from .turnlog import TurnLog, hesitations
-from .models import Switcher, load_models, host_restarts, PRESENTERS
+from .models import Switcher, load_models, host_restarts
 from .labauth import LabAuth
 from .gate import Gate, COOKIE as GATE_COOKIE, MAX_AGE as GATE_MAX_AGE
 from .presence import Presence, busy_line
@@ -288,8 +288,6 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
             raise HTTPException(403, "wrong password")            # checked first: the head count is not for strangers
         if not switcher.info(req.id):
             raise HTTPException(400, "not in the list")
-        if switcher.info(req.id).get("presenter_only") and by not in PRESENTERS:
-            raise HTTPException(403, "presenter only: this model is for demos")
         busy = busy_line(presence.count(but=req.here), vllm.queue() if hasattr(vllm, "queue") else None)
         if busy and not req.confirm:                              # a switch takes the wall away from everyone for a minute or more
             raise HTTPException(409, {"busy": True, "message": busy})

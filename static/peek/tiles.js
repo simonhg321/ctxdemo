@@ -77,6 +77,7 @@ peekPanels.tiles = (function () {
     } else {
       t.querySelector('#model-big').textContent = cur.label;
       t.querySelector('#model-sub').textContent = models.error ? 'last switch failed: ' + models.error : (cur.note || '');
+      t.querySelector('#model-big').style.color = t.querySelector('#model-sub').style.color = cur.abliterated ? '#e0553c' : '';   // an abliterated model is loaded: the tile says so in red
       t.querySelector('#model-hint').textContent = models.enabled ? (pickOpen ? '· pick one above' : (labUser ? '· tap the name to switch (signed in as ' + labUser + ')' : '· tap the name to switch (needs the switch password)')) : '';
     }
     t.classList.toggle('switching', !!sw);
@@ -84,10 +85,10 @@ peekPanels.tiles = (function () {
     pick.style.display = pickOpen ? '' : 'none';
     if (pickOpen && !pick.innerHTML) {
       pick.innerHTML = '<select id="model-sel">' + models.models.map(m =>
-        `<option value="${esc(m.id)}"${m.current ? ' selected' : ''}${m.tools === false ? ' class="no-tools" style="color:#e0553c"' : ''}>${m.presenter_only ? '⚠ ' : (m.tools === false ? '🔴 ' : '')}${esc(m.label)} — ${esc(m.note)}${m.cached ? '' : ' (not downloaded: slow)'}</option>`).join('') +
+        `<option value="${esc(m.id)}"${m.current ? ' selected' : ''}${m.tools === false ? ' class="no-tools" style="color:#e0553c"' : ''}>${m.abliterated ? '⚠ ' : (m.tools === false ? '🔴 ' : '')}${esc(m.label)} — ${esc(m.note)}${m.cached ? '' : ' (not downloaded: slow)'}</option>`).join('') +
         '</select>' + (labUser ? '' : '<input type="password" id="model-pw" placeholder="the switch password" autocomplete="off">') + '<button type="button" id="model-go">Switch</button><span id="model-msg" class="dim"></span>' +
         (models.models.some(m => m.tools === false) ? '<div class="no-tools" style="color:#e0553c">🔴 no tool calls: Hermes in the lab shells will not work while one of these is loaded</div>' : '') +
-        (models.models.some(m => m.presenter_only) ? '<div class="no-tools" style="color:#e0553c">⚠ refusals removed: a third party stripped out the model\'s refusals. Demo only, presenter only. It will say things the stock model will not.</div>' : '') +
+        (models.models.some(m => m.abliterated) ? '<div class="no-tools" style="color:#e0553c">⚠ abliterated: a third party stripped out the model\'s refusals. It will say things the stock model will not. Hermes in the lab shells is off while one is loaded.</div>' : '') +
         '<div class="dim"><a href="#" id="model-about">what are these models? →</a></div>';
       pick.querySelector('#model-about').onclick = e => { e.preventDefault(); peekBus.send('explain', { id: 'models' }); };   // opens the "the models" card on the wall
       let sure = false;                                             // others are here and the presenter said "switch anyway"
