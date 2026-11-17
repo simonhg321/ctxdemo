@@ -10,6 +10,9 @@ log = logging.getLogger("ctxdemo")
 ROOT = Path(__file__).resolve().parent.parent
 
 
+PRESENTERS = {"presenter", "simon"}   # who may load a `presenter_only` model: the switch password, or the simon lab login
+
+
 def load_models(path: Path = ROOT / "config" / "models.json") -> list[dict]:
     return json.loads(path.read_text())["models"]
 
@@ -69,6 +72,8 @@ class Switcher:
         m = self.info(model_id)
         if not m:
             raise ValueError("not in the list")
+        if m.get("presenter_only") and by not in PRESENTERS:
+            raise PermissionError("presenter only")       # demo-only models: not for every lab login
         if current is not None and model_id == current:
             raise RuntimeError("already on that model")   # a same-model restart is two minutes of downtime for nothing
         with self._lock:

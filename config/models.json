@@ -1,123 +1,141 @@
 {
-  "_comment": "Models the wall may switch vLLM to (NFCU Linode, 20 GB card). All open, none gated on Hugging Face. `args` are vLLM flags per model; `tools` = has a tool-call parser (the web toggle); `tokenizer` = HF repo for the chunk strip. Batch of 2026-09-26 (Simon: 'grab em all'): each booted once on the box with the wall's flags and answered with logprobs (trial log in JOURNAL); inclusionAI/Ling-3.0-tiny dropped (Triton shared-memory limit on Ada), XHToken/Spark-X2.5-4B dropped (architecture not in vLLM 0.30). Tool flags swept 2026-11-10 (direct tool call + a real Hermes tool call per model): `tools` is true only where both passed; Qwen2.5 GPTQ emits broken tool JSON, Granite passes direct but not Hermes, Phi-4 mini and DeepSeek R1 never call.",
-  "models": [
-    {
-      "id": "Qwen/Qwen3-8B-FP8",
-      "label": "Qwen3 8B",
-      "note": "today's model — 8B, FP8, thinking off",
-      "args": "--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes",
-      "tools": true,
-      "tokenizer": "Qwen/Qwen3-8B"
-    },
-    {
-      "id": "Qwen/Qwen3-14B-AWQ",
-      "label": "Qwen3 14B",
-      "note": "same family, nearly twice the size, 4-bit, thinking off",
-      "args": "--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes",
-      "tools": true,
-      "tokenizer": "Qwen/Qwen3-14B"
-    },
-    {
-      "id": "Qwen/Qwen3-4B-FP8",
-      "label": "Qwen3 4B",
-      "note": "half the size — faster, more coin-flips",
-      "args": "--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes",
-      "tools": true,
-      "tokenizer": "Qwen/Qwen3-4B"
-    },
-    {
-      "id": "Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4",
-      "label": "Qwen2.5 7B",
-      "note": "last year's Qwen, 4-bit",
-      "args": "--enable-auto-tool-choice --tool-call-parser hermes",
-      "tools": false,
-      "tokenizer": "Qwen/Qwen2.5-7B-Instruct"
-    },
-    {
-      "id": "google/gemma-4-12B-it-qat-w4a16-ct",
-      "label": "Gemma 4 12B",
-      "note": "Google's open family, 4-bit — a different lineage from Qwen",
-      "args": "--reasoning-parser gemma4 --enable-auto-tool-choice --tool-call-parser gemma4",
-      "tools": true,
-      "tokenizer": "google/gemma-4-12B-it-qat-w4a16-ct"
-    },
-    {
-      "id": "google/gemma-4-E4B-it",
-      "label": "Gemma 4 E4B",
-      "note": "the small Gemma, built for phones and laptops",
-      "args": "--reasoning-parser gemma4 --enable-auto-tool-choice --tool-call-parser gemma4",
-      "tools": true,
-      "tokenizer": "google/gemma-4-E4B-it"
-    },
-    {
-      "id": "openai/gpt-oss-20b",
-      "label": "gpt-oss 20B",
-      "note": "OpenAI's open model — 20B on disk, ~4B awake per token; reasons before it answers",
-      "args": "--reasoning-parser openai_gptoss --enable-auto-tool-choice --tool-call-parser openai",
-      "tools": true,
-      "tokenizer": "openai/gpt-oss-20b",
-      "max_tokens": 4000
-    },
-    {
-      "id": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
-      "label": "Nemotron 3 Nano 4B",
-      "note": "NVIDIA, hybrid transformer + state-space; thinks out loud in <think> tags first, so a 2,000-token leash",
-      "args": "--enable-auto-tool-choice --tool-call-parser qwen3_coder",
-      "tools": true,
-      "tokenizer": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
-      "max_tokens": 2000
-    },
-    {
-      "id": "openbmb/MiniCPM5-2B",
-      "label": "MiniCPM 5 2B",
-      "note": "the smallest one here; thinks out loud in <think> tags first, so a 2,000-token leash",
-      "args": "--enable-auto-tool-choice --tool-call-parser minicpm5",
-      "tools": true,
-      "tokenizer": "openbmb/MiniCPM5-2B",
-      "max_tokens": 2000
-    },
-    {
-      "id": "cyankiwi/Ornith-1.5-9B-AWQ-INT4",
-      "label": "Ornith 1.5 9B",
-      "note": "trending Qwen3.5-based 9B, community 4-bit; thinks out loud in <think> tags first, so a 2,000-token leash",
-      "args": "--enable-auto-tool-choice --tool-call-parser qwen3_coder",
-      "tools": true,
-      "tokenizer": "cyankiwi/Ornith-1.5-9B-AWQ-INT4",
-      "max_tokens": 2000
-    },
-    {
-      "id": "cbert33/NeoHorse-1-9B-FP8-Calibrated",
-      "label": "NeoHorse 1 9B",
-      "note": "trending Qwen3.5-based 9B, community FP8; thinks out loud in <think> tags first, so a 2,000-token leash",
-      "args": "--enable-auto-tool-choice --tool-call-parser qwen3_coder",
-      "tools": true,
-      "tokenizer": "cbert33/NeoHorse-1-9B-FP8-Calibrated",
-      "max_tokens": 2000
-    },
-    {
-      "id": "RedHatAI/DeepSeek-R1-Distill-Qwen-7B-FP8-dynamic",
-      "label": "DeepSeek R1 7B",
-      "note": "a reasoning model — thinks out loud in <think> tags first; loops sometimes under greedy, so a 2,000-token leash",
-      "args": "",
-      "tools": false,
-      "tokenizer": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
-      "max_tokens": 2000
-    },
-    {
-      "id": "microsoft/Phi-4-mini-instruct",
-      "label": "Phi-4 mini",
-      "note": "Microsoft, 3.8B, trained on textbooks",
-      "args": "",
-      "tools": false,
-      "tokenizer": "microsoft/Phi-4-mini-instruct"
-    },
-    {
-      "id": "ibm-granite/granite-3.3-2b-instruct",
-      "label": "Granite 3.3 2B",
-      "note": "IBM's small enterprise model",
-      "args": "",
-      "tools": false,
-      "tokenizer": "ibm-granite/granite-3.3-2b-instruct"
-    }
-  ]
+ "_comment": "Models the wall may switch vLLM to (NFCU Linode, 20 GB card). All open, none gated on Hugging Face. `args` are vLLM flags per model; `tools` = has a tool-call parser (the web toggle); `tokenizer` = HF repo for the chunk strip. Batch of 2026-09-26 (Simon: 'grab em all'): each booted once on the box with the wall's flags and answered with logprobs (trial log in JOURNAL); inclusionAI/Ling-3.0-tiny dropped (Triton shared-memory limit on Ada), XHToken/Spark-X2.5-4B dropped (architecture not in vLLM 0.30). Tool flags swept 2026-11-10 (direct tool call + a real Hermes tool call per model): `tools` is true only where both passed; Qwen2.5 GPTQ emits broken tool JSON, Granite passes direct but not Hermes, Phi-4 mini and DeepSeek R1 never call. Added 2026-11-17 (Simon): two ABLITERATED models (refusal behaviour removed by a third party) for the guardrails side-by-side. `presenter_only` = only the switch password or the `simon` login may load them; `tools` is false on purpose so the wall offers no tools and the lab shells' hermes wrapper refuses to start on them.",
+ "models": [
+  {
+   "id": "Qwen/Qwen3-8B-FP8",
+   "label": "Qwen3 8B",
+   "note": "today's model — 8B, FP8, thinking off",
+   "args": "--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes",
+   "tools": true,
+   "tokenizer": "Qwen/Qwen3-8B"
+  },
+  {
+   "id": "Qwen/Qwen3-14B-AWQ",
+   "label": "Qwen3 14B",
+   "note": "same family, nearly twice the size, 4-bit, thinking off",
+   "args": "--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes",
+   "tools": true,
+   "tokenizer": "Qwen/Qwen3-14B"
+  },
+  {
+   "id": "Qwen/Qwen3-4B-FP8",
+   "label": "Qwen3 4B",
+   "note": "half the size — faster, more coin-flips",
+   "args": "--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes",
+   "tools": true,
+   "tokenizer": "Qwen/Qwen3-4B"
+  },
+  {
+   "id": "Qwen/Qwen2.5-7B-Instruct-GPTQ-Int4",
+   "label": "Qwen2.5 7B",
+   "note": "last year's Qwen, 4-bit",
+   "args": "--enable-auto-tool-choice --tool-call-parser hermes",
+   "tools": false,
+   "tokenizer": "Qwen/Qwen2.5-7B-Instruct"
+  },
+  {
+   "id": "google/gemma-4-12B-it-qat-w4a16-ct",
+   "label": "Gemma 4 12B",
+   "note": "Google's open family, 4-bit — a different lineage from Qwen",
+   "args": "--reasoning-parser gemma4 --enable-auto-tool-choice --tool-call-parser gemma4",
+   "tools": true,
+   "tokenizer": "google/gemma-4-12B-it-qat-w4a16-ct"
+  },
+  {
+   "id": "google/gemma-4-E4B-it",
+   "label": "Gemma 4 E4B",
+   "note": "the small Gemma, built for phones and laptops",
+   "args": "--reasoning-parser gemma4 --enable-auto-tool-choice --tool-call-parser gemma4",
+   "tools": true,
+   "tokenizer": "google/gemma-4-E4B-it"
+  },
+  {
+   "id": "openai/gpt-oss-20b",
+   "label": "gpt-oss 20B",
+   "note": "OpenAI's open model — 20B on disk, ~4B awake per token; reasons before it answers",
+   "args": "--reasoning-parser openai_gptoss --enable-auto-tool-choice --tool-call-parser openai",
+   "tools": true,
+   "tokenizer": "openai/gpt-oss-20b",
+   "max_tokens": 4000
+  },
+  {
+   "id": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+   "label": "Nemotron 3 Nano 4B",
+   "note": "NVIDIA, hybrid transformer + state-space; thinks out loud in <think> tags first, so a 2,000-token leash",
+   "args": "--enable-auto-tool-choice --tool-call-parser qwen3_coder",
+   "tools": true,
+   "tokenizer": "nvidia/NVIDIA-Nemotron-3-Nano-4B-BF16",
+   "max_tokens": 2000
+  },
+  {
+   "id": "openbmb/MiniCPM5-2B",
+   "label": "MiniCPM 5 2B",
+   "note": "the smallest one here; thinks out loud in <think> tags first, so a 2,000-token leash",
+   "args": "--enable-auto-tool-choice --tool-call-parser minicpm5",
+   "tools": true,
+   "tokenizer": "openbmb/MiniCPM5-2B",
+   "max_tokens": 2000
+  },
+  {
+   "id": "cyankiwi/Ornith-1.5-9B-AWQ-INT4",
+   "label": "Ornith 1.5 9B",
+   "note": "trending Qwen3.5-based 9B, community 4-bit; thinks out loud in <think> tags first, so a 2,000-token leash",
+   "args": "--enable-auto-tool-choice --tool-call-parser qwen3_coder",
+   "tools": true,
+   "tokenizer": "cyankiwi/Ornith-1.5-9B-AWQ-INT4",
+   "max_tokens": 2000
+  },
+  {
+   "id": "cbert33/NeoHorse-1-9B-FP8-Calibrated",
+   "label": "NeoHorse 1 9B",
+   "note": "trending Qwen3.5-based 9B, community FP8; thinks out loud in <think> tags first, so a 2,000-token leash",
+   "args": "--enable-auto-tool-choice --tool-call-parser qwen3_coder",
+   "tools": true,
+   "tokenizer": "cbert33/NeoHorse-1-9B-FP8-Calibrated",
+   "max_tokens": 2000
+  },
+  {
+   "id": "RedHatAI/DeepSeek-R1-Distill-Qwen-7B-FP8-dynamic",
+   "label": "DeepSeek R1 7B",
+   "note": "a reasoning model — thinks out loud in <think> tags first; loops sometimes under greedy, so a 2,000-token leash",
+   "args": "",
+   "tools": false,
+   "tokenizer": "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+   "max_tokens": 2000
+  },
+  {
+   "id": "microsoft/Phi-4-mini-instruct",
+   "label": "Phi-4 mini",
+   "note": "Microsoft, 3.8B, trained on textbooks",
+   "args": "",
+   "tools": false,
+   "tokenizer": "microsoft/Phi-4-mini-instruct"
+  },
+  {
+   "id": "ibm-granite/granite-3.3-2b-instruct",
+   "label": "Granite 3.3 2B",
+   "note": "IBM's small enterprise model",
+   "args": "",
+   "tools": false,
+   "tokenizer": "ibm-granite/granite-3.3-2b-instruct"
+  },
+  {
+   "id": "huihui-ai/Huihui-Qwen3-8B-abliterated-v2",
+   "label": "Qwen3 8B, refusals removed",
+   "note": "DEMO ONLY: Qwen3 8B with its refusals stripped out by a third party. Compare with Qwen3 8B. Presenter only",
+   "args": "--reasoning-parser qwen3 --max-model-len 16384",
+   "tools": false,
+   "tokenizer": "Qwen/Qwen3-8B",
+   "presenter_only": true
+  },
+  {
+   "id": "AEON-7/Gemma-4-12B-it-AEON-Abliterated-K4-FP8",
+   "label": "Gemma 4 12B, refusals removed",
+   "note": "DEMO ONLY: Gemma 4 12B with its refusals stripped out by a third party. Compare with Gemma 4 12B. Presenter only",
+   "args": "--reasoning-parser gemma4",
+   "tools": false,
+   "tokenizer": "google/gemma-4-12B-it-qat-w4a16-ct",
+   "presenter_only": true
+  }
+ ]
 }

@@ -73,10 +73,29 @@ def test_switch_to_the_model_already_running_is_refused(tmp_path):
 def test_the_shipped_list_says_which_models_cannot_call_tools():
     """The switch list paints these red: Hermes in the lab shells needs tool calls."""
     from app.models import load_models
-    assert {m["label"] for m in load_models() if not m["tools"]} == {"Qwen2.5 7B", "DeepSeek R1 7B", "Phi-4 mini", "Granite 3.3 2B"}
+    assert {m["label"] for m in load_models() if not m["tools"]} == {"Qwen2.5 7B", "DeepSeek R1 7B", "Phi-4 mini", "Granite 3.3 2B", "Qwen3 8B, refusals removed", "Gemma 4 12B, refusals removed"}
 
 
 def test_the_switch_list_marks_models_without_tool_calls():
     from pathlib import Path
     js = (Path(__file__).resolve().parent.parent / "static" / "peek" / "tiles.js").read_text()
     assert "m.tools" in js and "no-tools" in js
+
+
+def test_presenter_only_models_are_refused_to_ordinary_lab_logins(tmp_path):
+    """The abliterated demo models: the switch password or the simon login may load them; lab3 may not."""
+    calls = []
+    sw, env = make(tmp_path, calls)
+    sw.models.append({"id": "x/abliterated", "label": "x", "note": "", "args": "", "tools": False, "tokenizer": "x", "presenter_only": True})
+    with pytest.raises(PermissionError):
+        sw.switch("x/abliterated", by="lab3")
+    assert not calls and sw.switching is None and not env.exists()
+    assert sw.switch("x/abliterated", by="simon")["switching"]["target"] == "x/abliterated"; sw.join(5)
+    assert sw.switch("Qwen/Qwen3-4B-FP8", "pw")["switching"]["target"] == "Qwen/Qwen3-4B-FP8"; sw.join(5)   # ordinary models stay open
+    assert sw.switch("x/abliterated", "pw")["switching"]["target"] == "x/abliterated"; sw.join(5)       # the switch password is the presenter
+
+
+def test_the_shipped_abliterated_models_are_presenter_only_and_toolless():
+    ms = [m for m in load_models() if "abliterated" in m["id"].lower()]
+    assert len(ms) == 2 and all(m.get("presenter_only") and m["tools"] is False and "enable-auto-tool-choice" not in m["args"] for m in ms)
+    assert not any(m.get("presenter_only") for m in load_models() if "abliterated" not in m["id"].lower())
