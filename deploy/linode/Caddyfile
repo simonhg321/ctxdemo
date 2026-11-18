@@ -61,6 +61,17 @@ demo.instockornot.club {
 		root * /etc/caddy/auth/site/welcome
 		file_server
 	}
+	# /faq/ — the lab's AI FAQ (glossary; jailbroken vs abliterated vs "dark web" models). Same pattern as /welcome/:
+	# the page lives on the box at /srv/data/caddy/site/faq/index.html.
+	redir /faq /faq/ 301
+	redir /ai-faq /faq/ 301
+	redir /AI-faq /faq/ 301
+	redir /ai-faq/ /faq/ 301
+	redir /AI-faq/ /faq/ 301
+	handle_path /faq/* {
+		root * /etc/caddy/auth/site/faq
+		file_server
+	}
 	redir /gpu /gpu/ 301
 	handle_path /gpu/* {
 		root * /etc/caddy/conf/site/gpu
