@@ -123,7 +123,7 @@
    "id": "huihui-ai/Huihui-Qwen3-8B-abliterated-v2",
    "label": "Qwen3 8B abliterated",
    "note": "ABLITERATED: Qwen3 8B with its refusals stripped out by a third party. It will say things the stock model will not. Compare with Qwen3 8B",
-   "args": "--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes --max-model-len 26000",
+   "args": "--reasoning-parser qwen3 --enable-auto-tool-choice --tool-call-parser hermes --gpu-memory-utilization 0.95 --max-model-len 32768",
    "tools": true,
    "tokenizer": "Qwen/Qwen3-8B",
    "abliterated": true
