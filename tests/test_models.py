@@ -73,7 +73,7 @@ def test_switch_to_the_model_already_running_is_refused(tmp_path):
 def test_the_shipped_list_says_which_models_cannot_call_tools():
     """The switch list paints these red: Hermes in the lab shells needs tool calls."""
     from app.models import load_models
-    assert {m["label"] for m in load_models() if not m["tools"]} == {"Qwen2.5 7B", "DeepSeek R1 7B", "Phi-4 mini", "Granite 3.3 2B", "Qwen3 8B abliterated", "Gemma 4 12B abliterated"}
+    assert {m["label"] for m in load_models() if not m["tools"]} == {"Qwen2.5 7B", "DeepSeek R1 7B", "Phi-4 mini", "Granite 3.3 2B"}
 
 
 def test_the_switch_list_marks_models_without_tool_calls():
@@ -90,10 +90,10 @@ def test_any_lab_login_may_load_an_abliterated_model(tmp_path):
     assert sw.switch("x/abliterated", by="lab3")["switching"]["target"] == "x/abliterated"; sw.join(5)
 
 
-def test_the_shipped_abliterated_models_are_labeled_and_toolless():
+def test_the_shipped_abliterated_models_are_labeled_and_call_tools():
     from pathlib import Path
     ms = [m for m in load_models() if "abliterated" in m["id"].lower()]
-    assert len(ms) == 2 and all(m.get("abliterated") and m["tools"] is False and "abliterated" in m["label"] and "ABLITERATED" in m["note"] for m in ms)
+    assert len(ms) == 2 and all(m.get("abliterated") and m["tools"] is True and "--enable-auto-tool-choice" in m["args"] and "abliterated" in m["label"] and "ABLITERATED" in m["note"] for m in ms)
     assert not any("presenter_only" in m for m in load_models())
     js = (Path(__file__).resolve().parent.parent / "static" / "peek" / "tiles.js").read_text()
     assert "m.abliterated" in js and "cur.abliterated" in js
