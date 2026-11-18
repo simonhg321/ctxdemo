@@ -41,6 +41,7 @@ class Config:
     switch_password: str = ""            # NFCU: a separate password for the model switch (CTXDEMO_SWITCH_PASSWORD); empty = admin_password does both
     lab_htpasswd: str = ""               # NFCU: the lab's htpasswd (`name bcrypt-hash`); `name:password` from it unlocks typing and switches the model (CTXDEMO_LAB_HTPASSWD)
     gate_file: str = ""                  # NFCU: one-line file holding the gate key (CTXDEMO_GATE_FILE); empty/missing = no gate
+    authlog: str = ""                    # NFCU: directory for the sign-in log (CTXDEMO_AUTHLOG), app/authlog.py; empty = log nothing
     compose_dir: str = ""                # NFCU: where docker-compose.yaml + .env live (mounted into the container); empty = disabled
     hf_hub_dir: str = ""                 # NFCU: the vLLM model cache (…/hub) to flag which models are already downloaded
     prices: dict[str, dict[str, float]] = field(default_factory=dict)
@@ -70,6 +71,7 @@ def load(root: Path = ROOT) -> Config:
     demo["switch_password"] = os.environ.get("CTXDEMO_SWITCH_PASSWORD", "")
     demo["lab_htpasswd"] = os.environ.get("CTXDEMO_LAB_HTPASSWD", "")
     demo["gate_file"] = os.environ.get("CTXDEMO_GATE_FILE", "")
+    demo["authlog"] = os.environ.get("CTXDEMO_AUTHLOG", "")
     demo["compose_dir"] = os.environ.get("CTXDEMO_COMPOSE_DIR", "")
     demo["hf_hub_dir"] = os.environ.get("CTXDEMO_HF_HUB", "")
     url = os.environ.get("VLLM_URL", "http://127.0.0.1:8100")

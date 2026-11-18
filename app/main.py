@@ -14,6 +14,7 @@ from .vllm import VLLM, clamp_sampling
 from .tools import Tools
 from .chunks import Chunker
 from .turnlog import TurnLog, hesitations
+from .authlog import AuthLog
 from .models import Switcher, load_models, host_restarts
 from .labauth import LabAuth
 from .gate import Gate, COOKIE as GATE_COOKIE, MAX_AGE as GATE_MAX_AGE
@@ -164,6 +165,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     # The gate (Linode): Caddy's forward_auth asks /api/gate/check before every request; see app/gate.py.
     gate = Gate(cfg.gate_file, lab=labauth)            # a lab login is also a key
     app.state.gate = gate
+    authlog = AuthLog(cfg.authlog)                     # who signed in and from where (NFCU); off without CTXDEMO_AUTHLOG
 
     def caller(request: Request) -> str:
         return (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "?")).split(",")[0].strip()
@@ -175,6 +177,8 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
     @app.get("/api/gate/check")
     def gate_check(request: Request):
         if gate.allows(request.cookies.get(GATE_COOKIE)):
+            if authlog.enabled and gate.enabled:
+                authlog.seen(gate.who(request.cookies.get(GATE_COOKIE)), caller(request))
             return Response(status_code=204)
         uri = request.headers.get("x-forwarded-uri") or "/"
         if request.headers.get("x-forwarded-method", "GET") == "GET" and "text/html" in request.headers.get("accept", ""):
@@ -191,7 +195,9 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         else:
             value = gate.try_key(str(body.get("key", "")), who)
         if not value:
+            authlog.signin(who, None, False, tried=str(body.get("name", "")) if "name" in body else "")   # never the key box's text
             raise HTTPException(403, "that does not open the gate")
+        authlog.signin(who, gate.who(value), True)
         r = JSONResponse({"ok": True})
         r.set_cookie(GATE_COOKIE, value, max_age=GATE_MAX_AGE, httponly=True, secure=request.headers.get("x-forwarded-proto", "https") == "https", samesite="lax", path="/")
         return r
@@ -219,6 +225,7 @@ def create_app(vllm=None, cfg=None, vision=None, tools=None, ears=None, chunker=
         that header to the user's own container. The shared key's cookie opens the wall, never a shell."""
         name = lab_user(request)
         if name:
+            authlog.seen(name, caller(request))
             return Response(status_code=204, headers={"X-Lab-User": name})
         if gate.enabled and gate.allows(request.cookies.get(GATE_COOKIE)):
             raise HTTPException(403, "the shared key does not open a shell: sign in with your lab name and password at /gate")

@@ -246,3 +246,32 @@ def test_the_wall_pages_carry_the_sign_out_link(signin):
     assert 'src="static/signout.js"' in (static / "index.html").read_text()            # relative, like every other path on the wall
     assert 'src="../signout.js"' in (static / "peek" / "wall.html").read_text()
     assert signin.get("/static/signout.js").status_code in (200, 401)                  # it exists (the gate may ask for a sign-in first)
+
+
+def test_sign_ins_are_logged_with_the_address_and_never_a_secret(fake, cfg, keyfile, labfile, tmp_path):
+    """Simon, 2026-11-18: log what addresses connect and which user signs in."""
+    d = tmp_path / "authlog"
+    c = TestClient(create_app(vllm=fake, cfg=replace(cfg, gate_file=str(keyfile), lab_htpasswd=str(labfile), authlog=str(d))), follow_redirects=False)
+    h = {"x-forwarded-for": "203.0.113.9"}
+    assert c.post("/api/gate", json={"name": "ada", "password": "nope-Secret9"}, headers=h).status_code == 403
+    assert c.post("/api/gate", json={"key": "ada:Wrong-Secret8"}, headers=h).status_code == 403
+    r = c.post("/api/gate", json={"name": "ada", "password": "Mixed:Case1"}, headers=h)
+    assert r.status_code == 200
+    ck = {"cookie": "gate=" + _cookie(r), "accept": "text/html"}
+    for _ in range(3):
+        assert c.get("/api/gate/check", headers={**ck, "x-forwarded-for": "198.51.100.4"}).status_code == 204
+    assert c.get("/api/shell/check", headers={**ck, "x-forwarded-for": "198.51.100.4"}).status_code == 204
+    assert c.post("/api/gate", json={"key": "test-key-0000"}, headers=h).status_code == 200
+    files = list(d.glob("signins-*.log")); assert len(files) == 1 and (files[0].stat().st_mode & 0o777) == 0o600
+    text = files[0].read_text(); lines = text.splitlines()
+    assert sum("refused" in ln and "ip=203.0.113.9" in ln for ln in lines) == 2
+    assert any("refused" in ln and "name=ada" in ln for ln in lines)
+    assert any(" ada " in ln and "signin  ok" in ln and "ip=203.0.113.9" in ln for ln in lines)
+    assert sum(" seen " in ln and "ip=198.51.100.4" in ln for ln in lines) == 1          # once per user and address per day
+    assert any("(key)" in ln and "signin  ok" in ln for ln in lines)
+    assert not any(s in text for s in ("Secret", "Mixed", "Case1", "test-key", _cookie(r)))
+
+
+def test_no_sign_in_log_unless_asked(labgated, tmp_path):
+    assert labgated.post("/api/gate", json={"key": "test-key-0000"}).status_code == 200
+    assert not list(tmp_path.rglob("signins-*.log"))

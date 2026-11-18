@@ -57,12 +57,14 @@ services:
       - CTXDEMO_HF_HUB=/srv/data/hf/hub
       - CTXDEMO_LAB_HTPASSWD=/srv/data/lab/htpasswd-shell     # lab logins (name:password) may unlock typing and switch the model
       - CTXDEMO_GATE_FILE=/srv/data/gate/key                  # the gate key: one line in this file on the host; edit it to change the key (no restart)
+      - CTXDEMO_AUTHLOG=/srv/data/authlog                     # sign-in log: who, from which address, ok or refused (app/authlog.py); pruned by the host's lab-audit-snap
       # - CTXDEMO_AUDIENCE=1                           # put back to clamp plain visitors (4k / 600 tokens / no web); /presenter/ keeps the full set
     volumes:
       - /srv/data/logs:/srv/data/logs
       - /srv/projects/ctxdemo/deploy/linode:/srv/compose      # the model switch writes .env here; the host's path unit does the restart
       - /srv/data/hf/hub:/srv/data/hf/hub:ro                # to flag which models are already downloaded
       - /srv/data/gate:/srv/data/gate:ro                    # the gate key file
+      - /var/log/lab-audit/wall:/srv/data/authlog           # root-only on the host, next to the command log
       - /srv/data/caddy:/srv/data/lab:ro                    # lab logins may unlock typing and switch the model (htpasswd-shell); the DIRECTORY: lab-user/rm-shell-user replace the file
     extra_hosts: ["host.docker.internal:host-gateway"]
     depends_on:

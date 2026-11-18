@@ -7,6 +7,7 @@ demo.instockornot.club {
 		output file /data/access.log {
 			roll_size 20mb
 			roll_keep 3
+			roll_keep_for 120h    # 5 days, same as the lab audit log (Simon, 2026-11-18)
 		}
 	}
 	# The gate: one key, no usernames (app/gate.py). Everything except the gate page itself asks ctxdemo first;
